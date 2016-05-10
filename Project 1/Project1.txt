@@ -1,0 +1,15 @@
+Properties of the main memory module
+
+1)The memory will have the following ports: clock, address (32-bits), data in (32-bits), data out (32-bits), access_size (2 bits), read/write (1 bit), and busy (1 bit).
+1a)clock: Self-explanatory what this does.
+1b)data in: This is the port that will be used write data into the memory.
+1c)data out: Response from the main memory.
+1d)access_size: The memory checks the amount of data to respond.  The possible sizes are word (4 bytes), 4-words (16 bytes), 8-words (32 bytes), and 16-words (64 bytes).  
+1e)read/write: Whether the memory is read from or written to.
+1f)busy: If the memory is responding to the request then this signal must remain asserted until the memory is done responding.
+1g)enable: This signal enables/disables the memory.  If the enable is deasserted then the memory will not respond to any requests, and if it is asserted, it will respond to the requests.
+2)Make the depth of the memory configurable (default 1MB) by using either a generic or constant.  We should be able to change this easily with a single change in the Verilog source. 
+3)The address and data port for the memory module should be 32-bits wide. This means that whenever a 32-bit address is supplied on the address line, based on the access_size, the memory module returns the appropriately sized data over the 32-bit data out bus. Note that you will have to combine four bytes and return it on the data out line when reading a 32-bit word.  For access sizes greater than 32-bit, the memory responds with the corresponding data in consecutive cycles.  For example, if the access_size requests 64 bytes of data, then the DRAM would use 16 consecutive cycles with each cycle placing 4 bytes on the data out. 
+4)Memory should use big-endian ordering. 
+5)The program code (instructions) starts at address 0x80020000 followed by the data and static variable (bss) segment. This means that we would start fetching instructions from address 0x80020000, and data would follow the instruction segment.
+6)The main memory should return the first word within one clock cycle. To do this, the address lines will be asserted at the rising edge of the clock, and the corresponding data lines should be set during the same rising edge of the clock cycle.
