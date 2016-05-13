@@ -1,14 +1,14 @@
-module memory_32bit #(
-	parameter MEMORY_BYTES = 1048576
+module memory #(
+	parameter depth = 1048576
 )(
 	output reg busy, 
 	output reg [31:0] data_out, 
-	input wire clk, read_write, enable, 
+	input wire clk, rd_wr, enable, 
 	input wire [1:0] access_size, 
-	input wire [31:0] data_in, address
+	input wire [31:0] data_in, addr
 );
 
-	reg [7:0] memory [0:MEMORY_BYTES-1];
+	reg [7:0] memory [0:depth-1];
 	reg reading;
 	reg [31:0] reading_address;
 	reg [3:0] read_cycles;
@@ -18,10 +18,10 @@ module memory_32bit #(
 
 		if (enable) 
 		begin
-			if (read_write && ~reading) 
+			if (rd_wr && ~reading) 
 			begin
 				reading <= 1;
-				reading_address <= address;
+				reading_address <= addr;
 
 				case (access_size)
 					00 : read_cycles <= 4'd0;
@@ -53,12 +53,12 @@ module memory_32bit #(
 
 	always_ff @ (posedge clk)
 	begin : MEM_WRITE
-		if (enable && ~read_write) 
+		if (enable && ~rd_wr) 
 		begin
-			memory[address + 3] <= data_in[7:0];
-			memory[address + 2] <= data_in[15:8];
-			memory[address + 1] <= data_in[23:16];
-			memory[address] <= data_in[31:24];
+			memory[addr + 3] <= data_in[7:0];
+			memory[addr + 2] <= data_in[15:8];
+			memory[addr + 1] <= data_in[23:16];
+			memory[addr] <= data_in[31:24];
 		end
 	end
 

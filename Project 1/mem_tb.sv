@@ -1,4 +1,4 @@
-module memory_32bit_tb;
+module memory_tb;
 	logic clk;
 	logic enable;
 	logic read_write;
@@ -110,15 +110,15 @@ module memory_32bit_tb;
 	end
 
 
-	memory_32bit memory (
+	memory memory (
 		.busy(busy), 
 		.data_out(data_out), 
 		.clk(clk), 
-		.read_write(read_write), 
+		.rd_wr(read_write), 
 		.enable(enable), 
 		.access_size(access_size),
 		.data_in(data_in), 
-		.address(address)
+		.addr(address)
 	);
 
 		
