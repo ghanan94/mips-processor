@@ -1,8 +1,9 @@
 module memory #(
 	parameter benchmark = "",
-	parameter depth = 1048576
+	parameter depth = 1048576,
+	parameter offset = 'h80020000
 )(
-	output reg busy, 
+	output wire busy, 
 	output reg [31:0] data_out, 
 	input wire clk, rd_wr, enable, 
 	input wire [1:0] access_size, 
@@ -10,11 +11,10 @@ module memory #(
 );
 
 	reg [31:0] memory [0:(depth >> 2)-1];
-	reg reading;
-	reg [31:0] reading_address;
-	reg [3:0] read_cycles;
-	wire [31:0] address;
-	wire [31:0] address_memory_index;
+	reg [31:0] mem_word_reading_index;
+	reg [3:0] remaining;
+	wire [31:0] effective_address;
+	wire [31:0] mem_word_index;
 
 	initial
 	begin
@@ -24,48 +24,30 @@ module memory #(
 	always_ff @ (posedge clk) 
 	begin : MEM_READ
 
-		if (enable == 1) 
-		begin
-			if ((rd_wr == 1) && (reading == 0)) 
-			begin
-				reading <= 1;
-				reading_address <= address_memory_index;
-
+		if (enable == 1) begin
+			if (remaining > 0) begin
+				data_out <= memory[mem_word_reading_index];
+				mem_word_reading_index <= mem_word_reading_index + 1;
+				remaining <= remaining - 1;
+			end else if (rd_wr == 1) begin
 				case (access_size)
-					00 : read_cycles <= 4'd0;
-					01 : read_cycles <= 4'd3;
-					10 : read_cycles <= 4'd7;
-					11 : read_cycles <= 4'd15;
+					2'b00 : remaining <= 4'd0;
+					2'b01 : remaining <= 4'd3;
+					2'b10 : remaining <= 4'd7;
+					2'b11 : remaining <= 4'd15;
 				endcase
-			end
-			else
-				reading <= 0;
-		end
 
-		if (reading == 1) 
-		begin
-			data_out <= memory[reading_address];
-
-			if (read_cycles == 4'd0)
-				reading <= 0;
-			else
-			begin
-				reading_address <= reading_address + 1;
-				read_cycles <= read_cycles - 1;
+				data_out <= memory[mem_word_index];
+				mem_word_reading_index <= mem_word_index + 1;
+			end else begin
+				// WRITE
+				memory[mem_word_index] <= data_in;
 			end
 		end
 	end
 
-	always_ff @ (posedge clk)
-	begin : MEM_WRITE
-		if ((enable == 1) && (rd_wr == 0)) 
-		begin
-			memory[address_memory_index] <= data_in;
-		end
-	end
-
-	assign busy = reading;
-	assign address = addr - 'h80020000;
-	assign address_memory_index = address >> 2;
+	assign effective_address = addr - offset;
+	assign mem_word_index = effective_address >> 2;
+	assign busy = remaining > 0;
 endmodule
 
