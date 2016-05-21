@@ -14,6 +14,7 @@ module memory #(
 	reg [31:0] reading_address;
 	reg [3:0] read_cycles;
 	wire [31:0] address;
+	wire [31:0] address_memory_index;
 
 	initial
 	begin
@@ -28,7 +29,7 @@ module memory #(
 			if ((rd_wr == 1) && (reading == 0)) 
 			begin
 				reading <= 1;
-				reading_address <= address >> 2;
+				reading_address <= address_memory_index;
 
 				case (access_size)
 					00 : read_cycles <= 4'd0;
@@ -59,12 +60,12 @@ module memory #(
 	begin : MEM_WRITE
 		if ((enable == 1) && (rd_wr == 0)) 
 		begin
-			memory[address >> 2] <= data_in;
+			memory[address_memory_index] <= data_in;
 		end
 	end
 
 	assign busy = reading;
 	assign address = addr - 'h80020000;
-
+	assign address_memory_index = address >> 2;
 endmodule
 
