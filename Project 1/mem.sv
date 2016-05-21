@@ -13,6 +13,7 @@ module memory #(
 	reg reading;
 	reg [31:0] reading_address;
 	reg [3:0] read_cycles;
+	wire [31:0] address;
 
 	initial
 	begin
@@ -22,12 +23,12 @@ module memory #(
 	always_ff @ (posedge clk) 
 	begin : MEM_READ
 
-		if (enable) 
+		if (enable == 1) 
 		begin
-			if (rd_wr && ~reading) 
+			if ((rd_wr == 1) && (reading == 0)) 
 			begin
 				reading <= 1;
-				reading_address <= addr >> 2;
+				reading_address <= address >> 2;
 
 				case (access_size)
 					00 : read_cycles <= 4'd0;
@@ -40,7 +41,7 @@ module memory #(
 				reading <= 0;
 		end
 
-		if (reading) 
+		if (reading == 1) 
 		begin
 			data_out <= memory[reading_address];
 
@@ -56,18 +57,14 @@ module memory #(
 
 	always_ff @ (posedge clk)
 	begin : MEM_WRITE
-		if (enable && ~rd_wr) 
+		if ((enable == 1) && (rd_wr == 0)) 
 		begin
-			memory[addr >> 2] <= data_in;
+			memory[address >> 2] <= data_in;
 		end
 	end
 
-	always_ff @ (posedge clk)
-	begin : BUSY
-		if (enable || reading)
-			busy <= 1;
-		else
-			busy <= 0;
-	end
+	assign busy = reading;
+	assign address = addr - 'h80020000;
+
 endmodule
 

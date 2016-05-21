@@ -104,9 +104,7 @@ module memory_tb;
 			data_in = 32'd910448573;
 		end
 
-		#500 begin
-			read_write = 1;
-		end
+		#500 $stop;
 	end
 
 
