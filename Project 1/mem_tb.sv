@@ -1,124 +1,59 @@
-module memory_tb;
-	logic clk;
-	logic enable;
-	logic read_write;
-	logic [31:0] data_in;
-	logic [31:0] address;
-	logic [1:0] access_size;
-	logic [31:0] data_out;
-	logic busy;
+module tb_memory;
+	logic clk, read, busy, en;
+	logic [31:0] addr, din, dout;
+	logic [1:0] size;
 
-	initial begin
-		clk = 1;
-		enable = 0;
-		read_write = 0;
-		data_in = 32'd0;
-		address = 32'd0;
-		access_size = 2'd0;
+    memory #(.benchmark("BubbleSort.x"), .depth(2**20)) mem(.clk(clk),
+		.addr(addr), .data_in(din), .data_out(dout),
+		.access_size(size), .rd_wr(read), .busy(busy), .enable(en));
+
+    initial $monitor("time %3d, addr %8h, data %8h, busy %1b", $time, addr,
+		dout, busy);
+ 
+    initial begin
+        clk = 0; forever #5 clk = ~clk;
+    end
+
+    initial begin
+        addr = 32'h80020000; 
+	size = 0; 
+	read = 1; 
+	en = 0;
+
+	#10 en = 1;
+
+	// data_out should not change here
+	// as enable is set to 0
+	#10 begin 
+		en = 0; 
+		addr = addr + 4;
 	end
 
-	always
-	begin : CLOCK
-		#250 clk = ~clk;
+	// Make sure that reading pauses when
+	// en is deasserted
+	#10 begin
+		addr = addr - 4;
+		en = 1;
+		size = 1;
 	end
+	#20 en = 0; // reading should pause
+	#20 en = 1; // reading should continue
 
-	always
-	begin : TEST_BENCH
+	// Make sure that changing address
+	// while read doesnt affect currently
+	// reading output
+	// #20
+	#40 addr = addr + 4;
 	
-		// Write value 234 to address 0
-		#500 begin
-			enable = 1; 
-			read_write = 0;
-			access_size = 2'd0;
-			data_in = 32'd234;
-			address = 32'd0;
-		end
-
-		// Read from address 0 (should be value 234)
-		#500 begin 
-			read_write = 1;
-		end
-
-		// Write alue 1537628013 to address 4
-		#500 begin
-			read_write = 0;
-			data_in = 32'd1537628013;
-			address = 32'd4;
-		end
-
-		// Read from adress 1 (should be value 1537628013)
-		#500 begin
-			read_write = 1;
-		end
-
-		// Write alue 537628013 to address 8
-		#500 begin
-			read_write = 0;
-			data_in = 32'd537628013;
-			address = 32'd8;
-		end
-
-		// Read from adress 1 (should be value 537628013)
-		#500 begin
-			read_write = 1;
-		end
-
-		// Write alue 2537628013 to address 12
-		#500 begin
-			read_write = 0;
-			data_in = 32'd2537628013;
-			address = 32'd12;
-		end
-
-		// Read from adress 1 (should be value 2537628013)
-		#500 begin
-			read_write = 1;
-		end
-
-		// read from address 0 through 15 (should return 234, 1537628013, 537628013, 2537628013)
-		#500 begin
-			address = 32'd0;
-			access_size = 2'd1;
-		end
-
-		// Should have no effect
-		#1000 begin
-			enable = 0;
-		end
-
-		#2000 begin
-			enable = 1;
-			read_write = 0;
-			address = 32'd1048572;
-			data_in = 32'd10448573;
-			access_size = 2'd0;
-		end
-
-		#500 begin
-			read_write = 1;
-		end
-
-		#500 begin
-			read_write = 0;
-			address = 32'd1048576;
-			data_in = 32'd910448573;
-		end
-
-		#500 $stop;
+	// Attempting a write during a read should
+	// do nothing
+	#20 addr = addr - 4;
+	#10 begin
+		addr = addr + 12;
+		din = 'hdeaddead;
+		read = 0;
 	end
+ 	#35 $stop;  
+    end
 
-
-	memory memory (
-		.busy(busy), 
-		.data_out(data_out), 
-		.clk(clk), 
-		.rd_wr(read_write), 
-		.enable(enable), 
-		.access_size(access_size),
-		.data_in(data_in), 
-		.addr(address)
-	);
-
-		
 endmodule
-
