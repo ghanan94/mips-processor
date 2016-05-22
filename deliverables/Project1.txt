@@ -1,0 +1,39 @@
+Properties of the main memory module
+
+The memory will have the following ports: clock, address (32-bits), data in (32-bits), data out (32-bits), access_size (2 bits), read/write (1 bit), busy (1 bit) and enable (1 bit).
+clock: Self-explanatory what this does.
+data in: This is the port that will be used write data into the memory.
+data out: Response from the main memory.
+access_size: The memory checks the amount of data to respond.  The possible sizes are word (4 bytes), 4-words (16 bytes), 8-words (32 bytes), and 16-words (64 bytes).
+read/write: Whether the memory is read from or written to (1=read, 0=write).
+busy: If the memory is not available (i.e. still working on a multi-word read (see point 4 above).
+enable: This signal enables/disables the memory.  If the enable is deasserted then the memory will not respond to any requests, and if it is asserted, it will respond to the requests.
+Make the depth of the memory configurable (default 1MB) by using either a parameter.  We should be able to override it in the testbench.
+The address and data port for the memory module should be 32-bits wide. This means that whenever a 32-bit address is supplied on the address line, based on the access_size, the memory module returns the appropriately sized data over the 32-bit data out bus. Note that you will have to combine four bytes and return it on the data out line when reading a 32-bit word.  For access sizes greater than 32-bit, the memory responds with the corresponding data in consecutive cycles.  For example, if the access_size requests 64 bytes of data, then the DRAM would use 16 consecutive cycles with each cycle placing 4 bytes on the data out. 
+Memory should use big-endian ordering.
+The program code (instructions) starts at address 0x80020000 followed by the data and static variable (bss) segment. This means that we would start fetching instructions from address 0x80020000, and data would follow the instruction segment.
+The main memory should return the first word within one clock cycle. To do this, the address lines will be asserted at the rising edge of the clock, and the corresponding data lines should be set during the same rising edge of the clock cycle.
+Testbenches
+
+The testbench file has been posted as pd1_tb.sv (link broken - the file is found in the parent folder).  It containes two testbenches.  Testbench tb_SimpleAdd requires that SimpleAdd.x be added to the same directory as your source code.  Likewise tb_BubbleSort requires that BubbleSort.x be added.  SimpleAdd.x and BubbleSort.x are found in benchmarks.zip.  They contain the object code, represented in hexadecimal, that results from compiling SimpleAdd.c and BubbleSort.c.
+
+In addition to the supplied testbenches, you must develop a testbench that tests at least four cases, preferably cases not covered by the supplied testbenches.
+
+Submission
+
+You must submit the following to your project group's PD1 dropbox:
+
+A text file containing a copy of the transcript output from the supplied testbenches and your testbench.
+Your source code for the memory module and your testbench.
+Tips
+
+1. This page shows how to implement and populate a very simple memory: http://www.asic-world.com/verilog/memory_fsm1.html
+
+2. You will use $readmemh to populate the memory (see tip 1 for an example).  The hex files represent the data in 32-bit units (eg. 8-digit hex numbers) so your memory data array will only populate correctly if it is an array of 32-bit words.
+
+3. Use the following lines in your memory module to define the testbench filename and the size of the memory in bytes:
+
+    parameter benchmark = "whatever.x";
+    parameter depth = 2**20; // =1 MB
+
+   These parameters get overridden by the memory module instantiation in the testbenches.
