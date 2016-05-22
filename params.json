@@ -1,0 +1,6 @@
+{
+  "name": "Mips-processor",
+  "tagline": "Subset of MIPS instruction processor implemented in SystemVerilog",
+  "body": "Subset of MIPS instruction processor implemented in SystemVerilog",
+  "note": "Don't delete this file! It's used internally to help with page regeneration."
+}
