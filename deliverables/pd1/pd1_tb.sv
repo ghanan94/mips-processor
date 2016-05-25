@@ -14,17 +14,19 @@ module tb_SimpleAdd;
 		en);
  
     initial begin
-        clk = 0; forever #5 clk = ~clk;
+        clk = 1; forever #5 clk = ~clk;
     end
 
     initial begin
-        addr = 32'h80020000; size = 0; read = 1; en = 0;
-		#10 en = 1;
-		#10 addr += 4;
-		#10 read = 0; din = 32'haaaaeeee;
-		#10 read = 1;
-		#20 $stop;
+        addr <= 32'h80020000; size <= 0; read <= 1; en <= 0;
+		#10 en <= 1;
+		#10 addr <= addr + 4;
+		#10 read <= 0; din <= 32'haaaaeeee;
+		#10 read <= 1;
+		#20 $stop; //$finish if using iverilog
     end
+
+    //initial $dumpvars(0, tb_SimpleAdd); // for iverilog+gtkwave
 
 endmodule
 
@@ -45,17 +47,19 @@ module tb_BubbleSort;
 		dout, busy);
  
     initial begin
-        clk = 0; forever #5 clk = ~clk;
+        clk = 1; forever #5 clk = ~clk;
     end
 
     initial begin
-        addr = 32'h80020000; size = 0; read = 1; en = 0;
-		#10 en = 1;
-		#10 size = 1;
-		#40 size = 2;
-		#80 size = 3;
-		#160 $stop;
+        addr <= 32'h80020000; size <= 0; read <= 1; en <= 0;
+		#10 en <= 1;
+		#10 size <= 1;
+		#40 size <= 2;
+		#80 size <= 3;
+		#160
+		#10 $stop; //$finish if using iverilog
     end
 
+    //initial $dumpvars(0, tb_BubbleSort); // for iverilog+gtkwave
+	
 endmodule
-
