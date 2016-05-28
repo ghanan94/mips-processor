@@ -1,3 +1,43 @@
+/*
+ * MODULE: memory
+ *
+ * DESCRIPTION: Implementation of a memory module. Data
+ *              is stored in 32 bit words, adddressed by
+ *              word's byte address.
+ *
+ * PARAMETERS:
+ *   benchmark String
+ *     - String value for name of file with data to
+ *       intially load into memory.
+ *   depth Integer
+ *     - Size of memory in bytes.
+ *   offset Integer
+ *     - Offset for memory address.
+ *
+ * INPUTS:
+ *   clk
+ *     - Clock signal.
+ *   rd_wr
+ *     - Read or write signal (1 = Read; 0 = Write).
+ *   enable
+ *     - Enable signal. If this is 0, do nothing.
+ *   access_size [1:0]
+ *     - Size of data to return. Data sizes mapping:
+ *       0 : 1 Word
+ *       1 : 4 Words
+ *       2 : 8 Words
+ *       3 : 16 Words
+ *   data_in [31:0]
+ *     - Input data to write to memory.
+ *   addr [31:0]
+ *     - Byte-address in memory to either read or write.
+ *
+ * OUTPUTS:
+ *   busy
+ *     - Memory working on a multi-word read if 1, else 0.
+ *   data_out [31:0]
+ *     - Response from memory.
+ */
 module memory #(
 	parameter benchmark = "",
 	parameter depth = 2**20,
