@@ -49,27 +49,44 @@ module mips #(
 	reg [31:0] pc;
 
 	// Register File signals
-	wire regs_wr_en;
-	wire [4:0] regs_wr_num, regs_rd0_num, regs_rd1_num;
-	wire [31:0] regs_wr_data;
-	wire [31:0] regs_rd0_data, regs_rd1_data;
+	reg rf_wr_en;
+	reg [4:0] rf_wr_num, rf_rd0_num, rf_rd1_num;
+	reg [31:0] rf_wr_data;
+	wire [31:0] rf_rd0_data, rf_rd1_data;
+
+	// This signal will be used to reset R31 (return address register)
+	reg reset_return_address_register;
 
 	regfile regs (
 		.clk(clk),
-		.wr_num(regs_wr_num),
-		.wr_data(regs_wr_data),
-		.wr_en(regs_wr_en),
-		.rd0_num(regs_rd0_num),
-		.rd1_num(regs_rd1_num),
-		.rd0_data(regs_rd0_data),
-		.rd1_data(regs_rd1_data)
+		.wr_num(rf_wr_num),
+		.wr_data(rf_wr_data),
+		.wr_en(rf_wr_en),
+		.rd0_num(rf_rd0_num),
+		.rd1_num(rf_rd1_num),
+		.rd0_data(rf_rd0_data),
+		.rd1_data(rf_rd1_data)
 	);
 
 	always_ff @ (posedge clk)
 	begin: MIPS
 		if (reset == 1) begin
+			// Reset Processor
 			pc <= pc_init;
-			reg_wr_en <= 0;
+			data_rd_wr <= 1;
+			
+			// Reset the stack pointer register
+			rf_wr_en <= 1;
+			rf_wr_num <= 29;
+			rf_wr_data <= sp_init;
+
+			// Reset the return address register in next clock cycle
+			reset_return_address_register <= 1;
+		end else if (reset_return_address_register == 1) begin
+			// Reset the return address register
+			rf_wr_num <= 31;
+			rf_wr_data <= 'h0;
+			reset_return_address_register <= 0;
 		end
 	end
 
