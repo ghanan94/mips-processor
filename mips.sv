@@ -61,8 +61,8 @@ module mips #(
 	input wire clk, reset,
 	input wire [31:0] instr_in, data_in,
 	output reg data_rd_wr,
-	output reg [31:0] data_addr, data_out,
-	output wire [31:0] instr_addr
+	output reg [31:0] data_out,
+	output wire [31:0] instr_addr, data_addr
 );
 	reg [4:0] stage;
 
@@ -73,17 +73,18 @@ module mips #(
 	reg [31:0] d_pc, d_signed_extended_offset;
 	reg [4:0] d_wb_register;
 	// A (0: pc; 1: rs); B (0: rt; 1: offset)
-	reg d_muxA_sel, d_muxB_sel, d_jumping, d_rf_wr_en, d_data_rd_wr;
+	reg d_muxA_sel, d_muxB_sel, d_jumping, d_rf_wr_en, d_data_rd_wr, d_wb_sel; // (d_wb_sel (0: alu_out, 1: mem_out))
 	ALU_OP_TYPE d_ALU_sel;
 
 	// Execute stage
-	reg e_rf_wr_en, e_data_rd_wr;
+	reg e_rf_wr_en, e_data_rd_wr, e_wb_sel;
 	reg [4:0] e_wb_register;
 	reg [31:0] e_alu_out, e_mem_data_to_store, e_alu_iA, e_alu_iB;
 
 	// Memory stage
-	reg m_rf_wr_en;
+	reg m_rf_wr_en, m_wb_sel;
 	reg [4:0] m_wb_register;
+	reg [31:0] m_alu_out;
 
 	// Register File signals
 	reg rf_wr_en;
@@ -178,6 +179,7 @@ module mips #(
 							d_jumping <= 0;
 							d_rf_wr_en <= 1;
 							d_data_rd_wr <= 1;
+							d_wb_sel <= 0;
 						end
 						default: begin
 							d_wb_register <= 'd0; // no writeback
@@ -195,6 +197,7 @@ module mips #(
 					d_jumping <= 0;
 					d_rf_wr_en <= 1;
 					d_data_rd_wr <= 1;
+					d_wb_sel <= 0;
 				end
 				LW     : begin
 					d_ALU_sel <= ADD;
@@ -213,6 +216,7 @@ module mips #(
 					d_jumping <= 0;
 					d_rf_wr_en <= 0;
 					d_data_rd_wr <= 0;
+					d_wb_sel <= 1;
 				end
 				default: begin
 					d_wb_register <= 'd0; // no writeback
@@ -235,6 +239,7 @@ module mips #(
 		end else if (stage[2] == 1) begin
 			e_rf_wr_en <= d_rf_wr_en;
 			e_data_rd_wr <= d_data_rd_wr;
+			e_wb_sel <= d_wb_sel;
 			e_mem_data_to_store <= rf_rd1_data;
 
 			case (d_ALU_sel)
@@ -254,8 +259,9 @@ module mips #(
 		end else if (stage[3] == 1) begin
 			data_rd_wr <= e_data_rd_wr;
 			m_rf_wr_en <= e_rf_wr_en;
+			m_wb_sel <= e_wb_sel;
 			m_wb_register <= e_wb_register;
-			data_addr <= e_alu_out;
+			m_alu_out <= e_alu_out;
 			data_out <= e_mem_data_to_store;
 		end
 	end
@@ -273,12 +279,15 @@ module mips #(
 			rf_wr_num <= 'd31;
 			rf_wr_data <= 'h0;
 		end else if (stage[4] == 1) begin
-			
+			rf_wr_en <= m_rf_wr_en;
+			rf_wr_num <= m_wb_register;
+			rf_wr_data <= (m_wb_sel == 1) ? data_in : m_alu_out;
 		end
 	end
 
 	assign instr_addr = f_pc;
 	assign e_alu_iA = (d_muxA_sel == 1) ? rf_rd0_data : d_pc;
 	assign e_alu_iB = (d_muxB_sel == 1) ? d_signed_extended_offset : rf_rd1_data;
+	assign data_addr = m_alu_out;
 
 endmodule
