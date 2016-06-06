@@ -45,8 +45,9 @@ module mips #(
 	output reg data_rd_wr,
 	output reg [31:0] instr_addr, data_addr, data_out
 );
-	// Fetch
+	reg [4:0] stage;
 	reg [31:0] pc;
+	reg [5:0] instruction_register;
 
 	// Register File signals
 	reg rf_wr_en;
@@ -72,21 +73,80 @@ module mips #(
 	begin: MIPS
 		if (reset == 1) begin
 			// Reset Processor
-			pc <= pc_init;
-			data_rd_wr <= 1;
-			
-			// Reset the stack pointer register
-			rf_wr_en <= 1;
-			rf_wr_num <= 29;
-			rf_wr_data <= sp_init;
+			stage <= 'h1;
 
 			// Reset the return address register in next clock cycle
 			reset_return_address_register <= 1;
 		end else if (reset_return_address_register == 1) begin
-			// Reset the return address register
-			rf_wr_num <= 31;
-			rf_wr_data <= 'h0;
 			reset_return_address_register <= 0;
+		end else begin
+			stage[4:1] <= stage[3:0];
+			stage[0] <= stage[4];
+		end
+	end
+
+	always_ff @ (posedge clk)
+	begin : FETCH
+		if (reset == 1) begin
+			// Reset PC
+			pc <= pc_init;
+		end else if (reset_return_address_register == 1) begin
+			
+		end else if (stage[0] == 1) begin
+			instruction_register <= instr_in;
+		end
+	end
+
+	always_ff @ (posedge clk)
+	begin : DECODE
+		if (reset == 1) begin
+			// Reset
+			
+		end else if (reset_return_address_register == 1) begin
+			
+		end else if (stage[1] == 1) begin
+			
+		end
+	end
+
+	always_ff @ (posedge clk)
+	begin : EXECUTE
+		if (reset == 1) begin
+			// Reset
+			
+		end else if (reset_return_address_register == 1) begin
+			
+		end else if (stage[2] == 1) begin
+			
+		end
+	end
+
+	always_ff @ (posedge clk)
+	begin : MEMORY
+		if (reset == 1) begin
+			// Reset
+			data_rd_wr <= 1;
+		end else if (reset_return_address_register == 1) begin
+			
+		end else if (stage[3] == 1) begin
+			
+		end
+	end
+
+	always_ff @ (posedge clk)
+	begin : WRITEBACK
+		if (reset == 1) begin
+			// Reset
+			// Reset the stack pointer register
+			rf_wr_en <= 1;
+			rf_wr_num <= 'd29;
+			rf_wr_data <= sp_init;
+		end else if (reset_return_address_register == 1) begin
+			// Reset the return address register
+			rf_wr_num <= 'd31;
+			rf_wr_data <= 'h0;
+		end else if (stage[4] == 1) begin
+			
 		end
 	end
 
