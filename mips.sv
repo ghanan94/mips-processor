@@ -43,11 +43,12 @@ module mips #(
 	input wire clk, reset,
 	input wire [31:0] instr_in, data_in,
 	output reg data_rd_wr,
-	output reg [31:0] instr_addr, data_addr, data_out
+	output reg [31:0] data_addr, data_out,
+	output wire [31:0] instr_addr
 );
 	reg [4:0] stage;
 	reg [31:0] pc;
-	reg [5:0] instruction_register;
+	reg [31:0] instruction_register;
 
 	// Register File signals
 	reg rf_wr_en;
@@ -94,6 +95,7 @@ module mips #(
 			
 		end else if (stage[0] == 1) begin
 			instruction_register <= instr_in;
+			pc <= pc + 4;
 		end
 	end
 
@@ -149,5 +151,7 @@ module mips #(
 			
 		end
 	end
+
+	assign instr_addr = pc;
 
 endmodule
