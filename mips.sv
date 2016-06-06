@@ -81,6 +81,10 @@ module mips #(
 	reg [4:0] e_wb_register;
 	reg [31:0] e_alu_out, e_mem_data_to_store, e_alu_iA, e_alu_iB;
 
+	// Memory stage
+	reg m_rf_wr_en;
+	reg [4:0] m_wb_register;
+
 	// Register File signals
 	reg rf_wr_en;
 	reg [4:0] rf_wr_num, rf_rd0_num, rf_rd1_num;
@@ -248,7 +252,11 @@ module mips #(
 		end else if (reset_return_address_register == 1) begin
 			
 		end else if (stage[3] == 1) begin
-			
+			data_rd_wr <= e_data_rd_wr;
+			m_rf_wr_en <= e_rf_wr_en;
+			m_wb_register <= e_wb_register;
+			data_addr <= e_alu_out;
+			data_out <= e_mem_data_to_store;
 		end
 	end
 
