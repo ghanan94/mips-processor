@@ -73,11 +73,13 @@ module mips #(
 	reg [31:0] d_pc, d_signed_extended_offset;
 	reg [4:0] d_wb_register;
 	// A (0: pc; 1: rs); B (0: rt; 1: offset)
-	reg d_muxA_sel, d_muxB_sel;
+	reg d_muxA_sel, d_muxB_sel, d_jumping, d_rf_wr_en, d_data_rd_wr;
 	ALU_OP_TYPE d_ALU_sel;
-	reg d_jumping;
-	reg d_rf_wr_en;
-	reg d_data_rd_wr;
+
+	// Execute stage
+	reg e_rf_wr_en, e_data_rd_wr;
+	reg [4:0] e_wb_register;
+	reg [31:0] e_alu_out, e_mem_data_to_store, e_alu_iA, e_alu_iB;
 
 	// Register File signals
 	reg rf_wr_en;
@@ -222,11 +224,19 @@ module mips #(
 	begin : EXECUTE
 		if (reset == 1) begin
 			// Reset
-			
+			e_rf_wr_en <= 0;
+			e_data_rd_wr <= 1;
 		end else if (reset_return_address_register == 1) begin
 			
 		end else if (stage[2] == 1) begin
-			
+			e_rf_wr_en <= d_rf_wr_en;
+			e_data_rd_wr <= d_data_rd_wr;
+			e_mem_data_to_store <= rf_rd1_data;
+
+			case (d_ALU_sel)
+				ADD     : e_alu_out <= e_alu_iA + e_alu_iB;
+				default : e_alu_out <= 'd0;
+			endcase
 		end
 	end
 
@@ -260,5 +270,7 @@ module mips #(
 	end
 
 	assign instr_addr = f_pc;
+	assign e_alu_iA = (d_muxA_sel == 1) ? rf_rd0_data : d_pc;
+	assign e_alu_iB = (d_muxB_sel == 1) ? d_signed_extended_offset : rf_rd1_data;
 
 endmodule
