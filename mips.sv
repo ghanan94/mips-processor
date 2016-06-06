@@ -35,6 +35,24 @@
  *     - Data output.
  */
 
+typedef enum reg [5:0] {
+	SPECIAL = 'b000000,
+	ADDIU   = 'b001001,
+	LW      = 'b100011,
+	SW      = 'b101011
+} MIPS_OPCODE;
+
+typedef enum reg [5:0] {
+	NOP     = 'b000000,
+	JR      = 'b001000,
+	ADDU    = 'b100001
+} MIPS_SPECIAL_FUNCT_OPCODE;
+
+typedef enum reg [1:0] {
+	ADD,
+	SUB
+} ALU_OP_TYPE;
+
 module mips #(
 	parameter [31:0] pc_init = 0,
 	parameter [31:0] sp_init = 0,
@@ -47,14 +65,26 @@ module mips #(
 	output wire [31:0] instr_addr
 );
 	reg [4:0] stage;
-	reg [31:0] pc;
-	reg [31:0] instruction_register;
+
+	// Fetch signals
+	reg [31:0] f_pc, f_instruction_register;
+
+	// Decode signals
+	reg [31:0] d_pc, d_signed_extended_offset;
+	reg [4:0] d_wb_register;
+	// A (0: pc; 1: rs); B (0: rt; 1: offset)
+	reg d_muxA_sel, d_muxB_sel;
+	ALU_OP_TYPE d_ALU_sel;
+	reg d_jumping;
+	reg d_rf_wr_en;
+	reg d_data_rd_wr;
 
 	// Register File signals
 	reg rf_wr_en;
 	reg [4:0] rf_wr_num, rf_rd0_num, rf_rd1_num;
 	reg [31:0] rf_wr_data;
 	wire [31:0] rf_rd0_data, rf_rd1_data;
+
 
 	// This signal will be used to reset R31 (return address register)
 	reg reset_return_address_register;
@@ -90,12 +120,17 @@ module mips #(
 	begin : FETCH
 		if (reset == 1) begin
 			// Reset PC
-			pc <= pc_init;
+			f_pc <= pc_init;
 		end else if (reset_return_address_register == 1) begin
 			
 		end else if (stage[0] == 1) begin
-			instruction_register <= instr_in;
-			pc <= pc + 4;
+			f_instruction_register <= instr_in;
+			
+			if (d_jumping == 1) begin
+				f_pc <= f_pc + rf_rd0_data;
+			end else begin
+				f_pc <= f_pc + 4;
+			end
 		end
 	end
 
@@ -103,11 +138,83 @@ module mips #(
 	begin : DECODE
 		if (reset == 1) begin
 			// Reset
-			
+			d_jumping <= 0;
+			d_rf_wr_en <= 0;
+			d_data_rd_wr <= 1;
 		end else if (reset_return_address_register == 1) begin
 			
 		end else if (stage[1] == 1) begin
-			
+			d_pc <= f_pc;
+			rf_rd0_num <= f_instruction_register[25:21]; // rs
+			rf_rd1_num <= f_instruction_register[20:16]; // rt
+			d_signed_extended_offset <= {{16{f_instruction_register[15]}}, f_instruction_register[15:0]};
+
+			case (f_instruction_register[31:25])
+				SPECIAL : begin
+					case (f_instruction_register[5:0])
+						NOP: begin
+							d_wb_register <= 'd0;
+							d_jumping <= 0;
+							d_rf_wr_en <= 0;
+							d_data_rd_wr <= 1;
+						end
+						JR   : begin
+							d_wb_register <= 'd0;
+							d_jumping <= 1;
+							d_rf_wr_en <= 0;
+							d_data_rd_wr <= 1;
+						end
+						ADDU   : begin
+							d_ALU_sel <= ADD;
+							d_muxA_sel <= 1; // rs
+							d_muxB_sel <= 0; // rt
+							d_wb_register <= f_instruction_register[15:11]; // rd
+							d_jumping <= 0;
+							d_rf_wr_en <= 1;
+							d_data_rd_wr <= 1;
+						end
+						default: begin
+							d_wb_register <= 'd0; // no writeback
+							d_jumping <= 0; // no jumping
+							d_rf_wr_en <= 0; // no updating reg file
+							d_data_rd_wr <= 1; // no write to mem
+						end
+					endcase
+				end
+				ADDIU  : begin
+					d_ALU_sel <= ADD;
+					d_muxA_sel <= 1; // rs
+					d_muxB_sel <= 1; // offset
+					d_wb_register <= f_instruction_register[20:16]; // rt
+					d_jumping <= 0;
+					d_rf_wr_en <= 1;
+					d_data_rd_wr <= 1;
+				end
+				LW     : begin
+					d_ALU_sel <= ADD;
+					d_muxA_sel <= 1; // rs
+					d_muxB_sel <= 1; // offset
+					d_wb_register <= f_instruction_register[20:16]; // rt
+					d_jumping <= 0;
+					d_rf_wr_en <= 1;
+					d_data_rd_wr <= 1;
+				end
+				SW     : begin
+					d_ALU_sel <= ADD;
+					d_muxA_sel <= 1; // rs
+					d_muxB_sel <= 1; // offset
+					d_wb_register <= 'd0; // no writeback
+					d_jumping <= 0;
+					d_rf_wr_en <= 0;
+					d_data_rd_wr <= 0;
+				end
+				default: begin
+					d_wb_register <= 'd0; // no writeback
+					d_jumping <= 0; // no jumping
+					d_rf_wr_en <= 0; // no updating reg file
+					d_data_rd_wr <= 1; // no write to mem
+				end
+			endcase
 		end
 	end
 
@@ -152,6 +259,6 @@ module mips #(
 		end
 	end
 
-	assign instr_addr = pc;
+	assign instr_addr = f_pc;
 
 endmodule
