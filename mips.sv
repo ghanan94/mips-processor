@@ -127,7 +127,7 @@ module mips #(
 
 	// FETCH
 	always_ff @ (posedge clk)
-	begin : FETCH
+	begin : FETCH_FF
 		if (reset == 1) begin
 			// Reset PC
 			f_pc <= pc_init;
@@ -148,13 +148,13 @@ module mips #(
 
 	// DECODE
 	always_comb
-	begin
+	begin : DECODE_COMB
 		rf_rd0_num <= f_instruction_register[25:21]; // rs
 		rf_rd1_num <= f_instruction_register[20:16]; // rt
 	end
 		
 	always_ff @ (posedge clk)
-	begin : DECODE
+	begin : DECODE_FF
 		if (reset == 1) begin
 			// Reset
 			d_jumping <= 0;
@@ -185,11 +185,13 @@ module mips #(
 							d_ALU_sel <= ADD;
 							d_muxA_sel <= 1; // rs
 							d_muxB_sel <= 0; // rt
+
 							d_wb_register <= f_instruction_register[15:11]; // rt
+							d_wb_sel <= 0;
+
 							d_jumping <= 0;
 							d_data_rd_wr <= 1;
 							d_rf_wr_en <= 1;
-							d_wb_sel <= 0;
 						end
 						default: begin
 							d_jumping <= 0; // no jumping
@@ -202,26 +204,31 @@ module mips #(
 					d_ALU_sel <= ADD;
 					d_muxA_sel <= 1; // rs
 					d_muxB_sel <= 1; // offset
+
 					d_wb_register <= f_instruction_register[20:16]; // rt
+					d_wb_sel <= 0;
+
 					d_jumping <= 0;
 					d_data_rd_wr <= 1;
 					d_rf_wr_en <= 1;
-					d_wb_sel <= 0;
 				end
 				LW     : begin
 					d_ALU_sel <= ADD;
 					d_muxA_sel <= 1; // rs
 					d_muxB_sel <= 1; // offset
+
 					d_wb_register <= f_instruction_register[20:16]; // rt
+					d_wb_sel <= 1;
+
 					d_jumping <= 0;
 					d_data_rd_wr <= 1;
 					d_rf_wr_en <= 1;
-					d_wb_sel <= 1;
 				end
 				SW     : begin
 					d_ALU_sel <= ADD;
 					d_muxA_sel <= 1; // rs
 					d_muxB_sel <= 1; // offset
+
 					d_jumping <= 0;
 					d_data_rd_wr <= 0;
 					d_rf_wr_en <= 0;
@@ -238,13 +245,13 @@ module mips #(
 
 	// EXECUTE
 	always_comb
-	begin
+	begin : EXECUTE_COMB
 		e_alu_iA <= (d_muxA_sel == 1) ? d_rd0 : d_pc;
 		e_alu_iB <= (d_muxB_sel == 1) ? d_signed_extended_offset : d_rd1;
 	end
 
 	always_ff @ (posedge clk)
-	begin : EXECUTE_CLOCKED
+	begin : EXECUTE_FF
 		if (reset == 1) begin
 			// Reset
 			e_rf_wr_en <= 0;
@@ -268,7 +275,7 @@ module mips #(
 
 	// MEMORY
 	always_comb
-	begin
+	begin : MEMORY_COMB
 		data_addr <= e_alu_out;
 		data_out <= e_mem_data_to_store;
 
@@ -283,13 +290,13 @@ module mips #(
 	end
 
 	always_ff @ (posedge clk)
-	begin : MEMORY
+	begin : MEMORY_FF
 		if (reset == 1) begin
 			// RESET
 			m_rf_wr_en <= 0;
 		end else if (reset_return_address_register == 1) begin
 
-		end else begin
+		end else if (stage[3] == 1) begin
 			m_alu_out <= e_alu_out;
 			m_wb_sel <= e_wb_sel;
 			m_rf_wr_en <= e_rf_wr_en;
@@ -300,8 +307,8 @@ module mips #(
 
 	// WRITEBACK
 	always_comb
-	begin : WRITEBACK
-		rf_wr_en <= reset | reset_return_address_register | m_rf_wr_en;
+	begin : WRITEBACK_COMB
+		rf_wr_en <= reset | reset_return_address_register | (m_rf_wr_en & stage[4]);
 		
 		if (reset == 1) begin
 			rf_wr_num <= 'd29;
