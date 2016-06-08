@@ -35,20 +35,20 @@
  *     - Data output.
  */
 
-typedef enum reg [5:0] {
+enum bit [5:0] {
 	SPECIAL = 'b000000,
 	ADDIU   = 'b001001,
 	LW      = 'b100011,
 	SW      = 'b101011
 } MIPS_OPCODE;
 
-typedef enum reg [5:0] {
+enum bit [5:0] {
 	NOP     = 'b000000,
 	JR      = 'b001000,
 	ADDU    = 'b100001
 } MIPS_SPECIAL_FUNCT_OPCODE;
 
-typedef enum reg [1:0] {
+enum bit [1:0] {
 	ADD,
 	SUB
 } ALU_OP_TYPE;
@@ -61,8 +61,8 @@ module mips #(
 	input wire clk, reset,
 	input wire [31:0] instr_in, data_in,
 	output reg data_rd_wr,
-	output reg [31:0] data_out,
-	output wire [31:0] instr_addr, data_addr
+	output reg [31:0] data_out, data_addr,
+	output wire [31:0] instr_addr
 );
 	reg [4:0] stage;
 
@@ -70,11 +70,11 @@ module mips #(
 	reg [31:0] f_pc, f_instruction_register;
 
 	// Decode signals
-	reg [31:0] d_pc, d_signed_extended_offset;
+	reg [31:0] d_pc, d_signed_extended_offset, d_rd0, d_rd1;
 	reg [4:0] d_wb_register;
 	// A (0: pc; 1: rs); B (0: rt; 1: offset)
 	reg d_muxA_sel, d_muxB_sel, d_jumping, d_rf_wr_en, d_data_rd_wr, d_wb_sel; // (d_wb_sel (0: alu_out, 1: mem_out))
-	ALU_OP_TYPE d_ALU_sel;
+	reg [1:0] d_ALU_sel;
 
 	// Execute stage
 	reg e_rf_wr_en, e_data_rd_wr, e_wb_sel;
@@ -85,6 +85,7 @@ module mips #(
 	reg m_rf_wr_en, m_wb_sel;
 	reg [4:0] m_wb_register;
 	reg [31:0] m_alu_out;
+	reg [31:0] temp_data;
 
 	// Register File signals
 	reg rf_wr_en;
@@ -123,6 +124,8 @@ module mips #(
 		end
 	end
 
+
+	// FETCH
 	always_ff @ (posedge clk)
 	begin : FETCH
 		if (reset == 1) begin
@@ -140,7 +143,16 @@ module mips #(
 			end
 		end
 	end
+	assign instr_addr = f_pc;
 
+
+	// DECODE
+	always_comb
+	begin
+		rf_rd0_num <= f_instruction_register[25:21]; // rs
+		rf_rd1_num <= f_instruction_register[20:16]; // rt
+	end
+		
 	always_ff @ (posedge clk)
 	begin : DECODE
 		if (reset == 1) begin
@@ -152,40 +164,37 @@ module mips #(
 			
 		end else if (stage[1] == 1) begin
 			d_pc <= f_pc;
-			rf_rd0_num <= f_instruction_register[25:21]; // rs
-			rf_rd1_num <= f_instruction_register[20:16]; // rt
 			d_signed_extended_offset <= {{16{f_instruction_register[15]}}, f_instruction_register[15:0]};
+			d_rd0 <= rf_rd0_data;
+			d_rd1 <= rf_rd1_data;
 
-			case (f_instruction_register[31:25])
+			case (f_instruction_register[31:26])
 				SPECIAL : begin
 					case (f_instruction_register[5:0])
 						NOP: begin
-							d_wb_register <= 'd0;
 							d_jumping <= 0;
-							d_rf_wr_en <= 0;
 							d_data_rd_wr <= 1;
+							d_rf_wr_en <= 0;
 						end
 						JR   : begin
-							d_wb_register <= 'd0;
 							d_jumping <= 1;
-							d_rf_wr_en <= 0;
 							d_data_rd_wr <= 1;
+							d_rf_wr_en <= 0;
 						end
 						ADDU   : begin
 							d_ALU_sel <= ADD;
 							d_muxA_sel <= 1; // rs
 							d_muxB_sel <= 0; // rt
-							d_wb_register <= f_instruction_register[15:11]; // rd
+							d_wb_register <= f_instruction_register[15:11]; // rt
 							d_jumping <= 0;
-							d_rf_wr_en <= 1;
 							d_data_rd_wr <= 1;
+							d_rf_wr_en <= 1;
 							d_wb_sel <= 0;
 						end
 						default: begin
-							d_wb_register <= 'd0; // no writeback
 							d_jumping <= 0; // no jumping
-							d_rf_wr_en <= 0; // no updating reg file
 							d_data_rd_wr <= 1; // no write to mem
+							d_rf_wr_en <= 0; // no updating reg file
 						end
 					endcase
 				end
@@ -195,8 +204,8 @@ module mips #(
 					d_muxB_sel <= 1; // offset
 					d_wb_register <= f_instruction_register[20:16]; // rt
 					d_jumping <= 0;
-					d_rf_wr_en <= 1;
 					d_data_rd_wr <= 1;
+					d_rf_wr_en <= 1;
 					d_wb_sel <= 0;
 				end
 				LW     : begin
@@ -205,31 +214,37 @@ module mips #(
 					d_muxB_sel <= 1; // offset
 					d_wb_register <= f_instruction_register[20:16]; // rt
 					d_jumping <= 0;
-					d_rf_wr_en <= 1;
 					d_data_rd_wr <= 1;
+					d_rf_wr_en <= 1;
+					d_wb_sel <= 1;
 				end
 				SW     : begin
 					d_ALU_sel <= ADD;
 					d_muxA_sel <= 1; // rs
 					d_muxB_sel <= 1; // offset
-					d_wb_register <= 'd0; // no writeback
 					d_jumping <= 0;
-					d_rf_wr_en <= 0;
 					d_data_rd_wr <= 0;
-					d_wb_sel <= 1;
+					d_rf_wr_en <= 0;
 				end
 				default: begin
-					d_wb_register <= 'd0; // no writeback
 					d_jumping <= 0; // no jumping
-					d_rf_wr_en <= 0; // no updating reg file
 					d_data_rd_wr <= 1; // no write to mem
+					d_rf_wr_en <= 0; // no updating reg file
 				end
 			endcase
 		end
 	end
 
+
+	// EXECUTE
+	always_comb
+	begin
+		e_alu_iA <= (d_muxA_sel == 1) ? d_rd0 : d_pc;
+		e_alu_iB <= (d_muxB_sel == 1) ? d_signed_extended_offset : d_rd1;
+	end
+
 	always_ff @ (posedge clk)
-	begin : EXECUTE
+	begin : EXECUTE_CLOCKED
 		if (reset == 1) begin
 			// Reset
 			e_rf_wr_en <= 0;
@@ -240,7 +255,8 @@ module mips #(
 			e_rf_wr_en <= d_rf_wr_en;
 			e_data_rd_wr <= d_data_rd_wr;
 			e_wb_sel <= d_wb_sel;
-			e_mem_data_to_store <= rf_rd1_data;
+			e_mem_data_to_store <= d_rd1;
+			e_wb_register <= d_wb_register;
 
 			case (d_ALU_sel)
 				ADD     : e_alu_out <= e_alu_iA + e_alu_iB;
@@ -248,46 +264,55 @@ module mips #(
 			endcase
 		end
 	end
+	
 
-	always_ff @ (posedge clk)
-	begin : MEMORY
+	// MEMORY
+	always_comb
+	begin
+		data_addr <= e_alu_out;
+		data_out <= e_mem_data_to_store;
+
 		if (reset == 1) begin
 			// Reset
 			data_rd_wr <= 1;
 		end else if (reset_return_address_register == 1) begin
-			
-		end else if (stage[3] == 1) begin
+			data_rd_wr <= 1;
+		end else begin
 			data_rd_wr <= e_data_rd_wr;
-			m_rf_wr_en <= e_rf_wr_en;
-			m_wb_sel <= e_wb_sel;
-			m_wb_register <= e_wb_register;
-			m_alu_out <= e_alu_out;
-			data_out <= e_mem_data_to_store;
 		end
 	end
 
 	always_ff @ (posedge clk)
-	begin : WRITEBACK
+	begin : MEMORY
 		if (reset == 1) begin
-			// Reset
-			// Reset the stack pointer register
-			rf_wr_en <= 1;
+			// RESET
+			m_rf_wr_en <= 0;
+		end else if (reset_return_address_register == 1) begin
+
+		end else begin
+			m_alu_out <= e_alu_out;
+			m_wb_sel <= e_wb_sel;
+			m_rf_wr_en <= e_rf_wr_en;
+			m_wb_register <= e_wb_register;
+		end
+	end
+
+
+	// WRITEBACK
+	always_comb
+	begin : WRITEBACK
+		rf_wr_en <= reset | reset_return_address_register | m_rf_wr_en;
+		
+		if (reset == 1) begin
 			rf_wr_num <= 'd29;
 			rf_wr_data <= sp_init;
 		end else if (reset_return_address_register == 1) begin
-			// Reset the return address register
 			rf_wr_num <= 'd31;
-			rf_wr_data <= 'h0;
-		end else if (stage[4] == 1) begin
-			rf_wr_en <= m_rf_wr_en;
+			rf_wr_data <= ra_init;
+		end else begin
 			rf_wr_num <= m_wb_register;
 			rf_wr_data <= (m_wb_sel == 1) ? data_in : m_alu_out;
 		end
 	end
-
-	assign instr_addr = f_pc;
-	assign e_alu_iA = (d_muxA_sel == 1) ? rf_rd0_data : d_pc;
-	assign e_alu_iB = (d_muxB_sel == 1) ? d_signed_extended_offset : rf_rd1_data;
-	assign data_addr = m_alu_out;
 
 endmodule
