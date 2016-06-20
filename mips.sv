@@ -39,6 +39,7 @@ enum bit [5:0] {
 	SPECIAL = 'b000000,
 	JAL     = 'b000011,
 	BEQ     = 'b000100,
+	BNE     = 'b000101,
 	ADDIU   = 'b001001,
 	LW      = 'b100011,
 	SW      = 'b101011
@@ -245,6 +246,15 @@ module mips #(
 					d_signed_extended_offset <= {{14{f_instruction_register[15]}}, f_instruction_register[15:0], 2'b00};
 
 					d_branch <= rf_rd0_data == rf_rd1_data; // branch if rs == rt
+					d_jal <= 0;
+					d_jumping <= 0;
+					d_data_rd_wr <= 1;
+					d_rf_wr_en <= 0;
+				end
+				BNE    : begin
+					d_signed_extended_offset <= {{14{f_instruction_register[15]}}, f_instruction_register[15:0], 2'b00};
+
+					d_branch <= rf_rd0_data != rf_rd1_data; // branch if rs != rt
 					d_jal <= 0;
 					d_jumping <= 0;
 					d_data_rd_wr <= 1;
