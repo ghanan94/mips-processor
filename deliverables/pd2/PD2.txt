@@ -1,0 +1,15 @@
+You are to implement a mips module that correctly executes the code found in the SimpleAdd testbench.  I suggest that you build a datapath with the five stages (IF, ID, EX, ME, WB) and that takes 5 cycles to execute each instruction.  i.e. not pipelined.  In PD3 you will expand the datapath to correctly execute all of the testbenches, and in PD4 you will pipeline the datapath including data-forwarding and stalling for load-delay hazards.
+
+Download pd2.zip.  It contains the testbench module in pd2_tb.sv and the register file module in regfile.sv.  The testbench module instantiates two copies of your memory module, one for instructions, and one for data (this will be useful when you pipeline it and need to access instruction and load/store data in the same cycle).  It also instantiates the mips module that you are to build.  The port list can be inferred from the instantiation.
+
+Your mips module should have the following parameter declarations:
+
+    parameter [31:0] pc_init = 0;
+    parameter [31:0] sp_init = 0;
+    parameter [31:0] ra_init = 0;
+
+These are overridden in the testbench module.  They provide initial values for the program counter, stack pointer (R29), and return address register (R31).  After your mips processor comes out of reset, it should initialize using those values.
+
+Your mips module should instantiate the regfile module and name it regs.  It implements R0-R31.  The testbench module monitors the values of the instruction memory address (PC) and the contents of R2 and R3 within the regs entity to help verify correct operation.
+
+As you can see if you look at section .text in SimpleAdd.dmp, the program uses these instructions: addiu, addu, jr, li, lw, move, nop, sw.  However the number of unique instructions is actually just six since li and move are pseudo-instructions.  For details on the instructions' encoding and function, see the MipsInstructionSetReference.pdf.
