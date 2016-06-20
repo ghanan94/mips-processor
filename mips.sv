@@ -37,21 +37,22 @@
 
 enum bit [5:0] {
 	SPECIAL = 'b000000,
-	JAL	= 'b000011,
+	JAL     = 'b000011,
 	ADDIU   = 'b001001,
 	LW      = 'b100011,
 	SW      = 'b101011
 } MIPS_OPCODE;
 
 enum bit [5:0] {
-	NOP     = 'b000000,
+	SLL     = 'b000000,
 	JR      = 'b001000,
 	ADDU    = 'b100001
 } MIPS_SPECIAL_FUNCT_OPCODE;
 
 enum bit [1:0] {
 	ADD,
-	SUB
+	SUB,
+	SHIFT_LEFT_LOGICAL
 } ALU_OP_TYPE;
 
 module mips #(
@@ -169,17 +170,24 @@ module mips #(
 
 		end else if (stage[1] == 1) begin
 			d_pc <= f_pc;
-			d_rd0 <= rf_rd0_data;
-			d_rd1 <= rf_rd1_data;
 
 			case (f_instruction_register[31:26])
 				SPECIAL : begin
 					case (f_instruction_register[5:0])
-						NOP: begin
+						SLL: begin
+							d_ALU_sel <= SHIFT_LEFT_LOGICAL;
+							d_muxA_sel <= 1; // rt
+							d_muxB_sel <= 1; // offset
+							d_signed_extended_offset <= {27'b0, f_instruction_register[10:6]};
+							d_rd0 <= rf_rd1_data; // rt
+
+							d_wb_register <= f_instruction_register[15:11]; // rd
+							d_wb_sel <= 0;
+
 							d_jal <= 0;
 							d_jumping <= 0;
 							d_data_rd_wr <= 1;
-							d_rf_wr_en <= 0;
+							d_rf_wr_en <= 1;
 						end
 						JR   : begin
 							d_jal <= 0;
@@ -191,6 +199,8 @@ module mips #(
 							d_ALU_sel <= ADD;
 							d_muxA_sel <= 1; // rs
 							d_muxB_sel <= 0; // rt
+							d_rd0 <= rf_rd0_data; // rs
+							d_rd1 <= rf_rd1_data; // rt
 
 							d_wb_register <= f_instruction_register[15:11]; // rt
 							d_wb_sel <= 0;
@@ -227,6 +237,7 @@ module mips #(
 					d_muxA_sel <= 1; // rs
 					d_muxB_sel <= 1; // offset
 					d_signed_extended_offset <= {{16{f_instruction_register[15]}}, f_instruction_register[15:0]};
+					d_rd0 <= rf_rd0_data; // rs
 
 					d_wb_register <= f_instruction_register[20:16]; // rt
 					d_wb_sel <= 0;
@@ -241,6 +252,7 @@ module mips #(
 					d_muxA_sel <= 1; // rs
 					d_muxB_sel <= 1; // offset
 					d_signed_extended_offset <= {{16{f_instruction_register[15]}}, f_instruction_register[15:0]};
+					d_rd0 <= rf_rd0_data; // rs
 
 					d_wb_register <= f_instruction_register[20:16]; // rt
 					d_wb_sel <= 1;
@@ -255,6 +267,8 @@ module mips #(
 					d_muxA_sel <= 1; // rs
 					d_muxB_sel <= 1; // offset
 					d_signed_extended_offset <= {{16{f_instruction_register[15]}}, f_instruction_register[15:0]};
+					d_rd0 <= rf_rd0_data; // rs
+					d_rd1 <= rf_rd1_data; // rt
 
 					d_jal <= 0;
 					d_jumping <= 0;
@@ -295,8 +309,9 @@ module mips #(
 			e_wb_register <= d_wb_register;
 
 			case (d_ALU_sel)
-				ADD     : e_alu_out <= e_alu_iA + e_alu_iB;
-				default : e_alu_out <= 'd0;
+				ADD                 : e_alu_out <= e_alu_iA + e_alu_iB;
+				SHIFT_LEFT_LOGICAL  : e_alu_out <= e_alu_iA << e_alu_iB;
+				default             : e_alu_out <= 'd0;
 			endcase
 		end
 	end
