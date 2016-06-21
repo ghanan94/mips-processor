@@ -100,7 +100,6 @@ module mips #(
 	reg m_rf_wr_en, m_wb_sel;
 	reg [4:0] m_wb_register;
 	reg [31:0] m_alu_out;
-	reg [31:0] temp_data;
 
 	// Register File signals
 	reg rf_wr_en;
