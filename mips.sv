@@ -41,6 +41,7 @@ enum bit [5:0] {
 	BEQ     = 'b000100,
 	BNE     = 'b000101,
 	ADDIU   = 'b001001,
+	SLTI		= 'b001010,
 	LW      = 'b100011,
 	SW      = 'b101011
 } MIPS_OPCODE;
@@ -54,7 +55,8 @@ enum bit [5:0] {
 enum bit [1:0] {
 	ADD,
 	SUB,
-	SHIFT_LEFT_LOGICAL
+	SHIFT_LEFT_LOGICAL,
+	LESS_THAN
 } ALU_OP_TYPE;
 
 module mips #(
@@ -276,6 +278,22 @@ module mips #(
 					d_data_rd_wr <= 1;
 					d_rf_wr_en <= 1;
 				end
+				SLTI   : begin
+					d_ALU_sel <= LESS_THAN;
+					d_muxA_sel <= 1; // rs
+					d_muxB_sel <= 1; // offset
+					d_signed_extended_offset <= {{16{f_instruction_register[15]}}, f_instruction_register[15:0]};
+					d_rd0 <= rf_rd0_data; // rs
+
+					d_wb_register <= f_instruction_register[20:16]; // rt
+					d_wb_sel <= 0;
+
+					d_branch <= 0;
+					d_jal <= 0;
+					d_jumping <= 0;
+					d_data_rd_wr <= 1;
+					d_rf_wr_en <= 1;
+				end
 				LW     : begin
 					d_ALU_sel <= ADD;
 					d_muxA_sel <= 1; // rs
@@ -343,6 +361,7 @@ module mips #(
 			case (d_ALU_sel)
 				ADD                 : e_alu_out <= e_alu_iA + e_alu_iB;
 				SHIFT_LEFT_LOGICAL  : e_alu_out <= e_alu_iA << e_alu_iB;
+				LESS_THAN           : e_alu_out <= e_alu_iA < e_alu_iB;
 				default             : e_alu_out <= 'd0;
 			endcase
 		end
