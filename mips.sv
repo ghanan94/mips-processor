@@ -36,15 +36,16 @@
  */
 
 enum bit [5:0] {
-	SPECIAL = 'b000000,
-	J       = 'b000010,
-	JAL     = 'b000011,
-	BEQ     = 'b000100,
-	BNE     = 'b000101,
-	ADDIU   = 'b001001,
-	SLTI		= 'b001010,
-	LW      = 'b100011,
-	SW      = 'b101011
+	SPECIAL  = 'b000000,
+	J        = 'b000010,
+	JAL      = 'b000011,
+	BEQ      = 'b000100,
+	BNE      = 'b000101,
+	ADDIU    = 'b001001,
+	SLTI		 = 'b001010,
+	SPECIAL2 = 'b011100,
+	LW       = 'b100011,
+	SW       = 'b101011
 } MIPS_OPCODE;
 
 enum bit [5:0] {
@@ -54,9 +55,14 @@ enum bit [5:0] {
 	SUBU    = 'b100011
 } MIPS_SPECIAL_FUNCT_OPCODE;
 
-enum bit [1:0] {
+enum bit [5:0] {
+	MUL     = 'b000010
+} MIPS_SPECIAL2_FUNCT_OPCODE;
+
+enum bit [2:0] {
 	ADD,
 	SUB,
+	MULTIPLY,
 	SHIFT_LEFT_LOGICAL,
 	LESS_THAN
 } ALU_OP_TYPE;
@@ -82,7 +88,7 @@ module mips #(
 	reg [4:0] d_wb_register;
 	// A (0: pc; 1: rs); B (0: rt; 1: offset)
 	reg d_muxA_sel, d_muxB_sel, d_jumping, d_branch, d_rf_wr_en, d_data_rd_wr, d_wb_sel; // (d_wb_sel (0: alu_out, 1: mem_out))
-	reg [1:0] d_ALU_sel;
+	reg [2:0] d_ALU_sel;
 
 	// Execute stage
 	reg e_rf_wr_en, e_data_rd_wr, e_wb_sel;
@@ -310,6 +316,31 @@ module mips #(
 					d_data_rd_wr <= 1;
 					d_rf_wr_en <= 1;
 				end
+				SPECIAL2: begin
+					case (f_instruction_register[5:0])
+						MUL: begin
+							d_ALU_sel <= MULTIPLY;
+							d_muxA_sel <= 1; // rs
+							d_muxB_sel <= 0; // rt
+							d_rd0 <= rf_rd0_data; // rs
+							d_rd1 <= rf_rd1_data; // rt
+
+							d_wb_register <= f_instruction_register[15:11]; // rd
+							d_wb_sel <= 0;
+
+							d_branch <= 0;
+							d_jumping <= 0;
+							d_data_rd_wr <= 1;
+							d_rf_wr_en <= 1;
+						end
+						default   : begin
+							d_branch <= 0; // no branching
+							d_jumping <= 0; // no jumping
+							d_data_rd_wr <= 1; // no write to mem
+							d_rf_wr_en <= 0; // no updating reg file
+						end
+					endcase
+				end
 				LW     : begin
 					d_ALU_sel <= ADD;
 					d_muxA_sel <= 1; // rs
@@ -374,6 +405,7 @@ module mips #(
 			case (d_ALU_sel)
 				ADD                 : e_alu_out <= e_alu_iA + e_alu_iB;
 				SUB                 : e_alu_out <= e_alu_iA - e_alu_iB;
+				MULTIPLY            : e_alu_out <= e_alu_iA * e_alu_iB;
 				SHIFT_LEFT_LOGICAL  : e_alu_out <= e_alu_iA << e_alu_iB;
 				LESS_THAN           : e_alu_out <= e_alu_iA < e_alu_iB;
 				default             : e_alu_out <= 'd0;
