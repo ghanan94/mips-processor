@@ -240,7 +240,7 @@ module mips #(
 					d_jal <= 1;
 					d_jumping <= 0;
 					d_data_rd_wr <= 1;
-					d_rf_wr_en <= 0;
+					d_rf_wr_en <= 1;
 				end
 				BEQ    : begin
 					d_signed_extended_offset <= {{14{f_instruction_register[15]}}, f_instruction_register[15:0], 2'b00};
