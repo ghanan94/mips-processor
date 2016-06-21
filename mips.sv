@@ -52,7 +52,8 @@ enum bit [5:0] {
 	SLL     = 'b000000,
 	JR      = 'b001000,
 	ADDU    = 'b100001,
-	SUBU    = 'b100011
+	SUBU    = 'b100011,
+	SLT     = 'b101010
 } MIPS_SPECIAL_FUNCT_OPCODE;
 
 enum bit [5:0] {
@@ -225,6 +226,21 @@ module mips #(
 						end
 						SUBU   : begin
 							d_ALU_sel <= SUB;
+							d_muxA_sel <= 1; // rs
+							d_muxB_sel <= 0; // rt
+							d_rd0 <= rf_rd0_data; // rs
+							d_rd1 <= rf_rd1_data; // rt
+
+							d_wb_register <= f_instruction_register[15:11]; // rt
+							d_wb_sel <= 0;
+
+							d_branch <= 0;
+							d_jumping <= 0;
+							d_data_rd_wr <= 1;
+							d_rf_wr_en <= 1;
+						end
+						SLT    : begin
+							d_ALU_sel <= LESS_THAN;
 							d_muxA_sel <= 1; // rs
 							d_muxB_sel <= 0; // rt
 							d_rd0 <= rf_rd0_data; // rs
