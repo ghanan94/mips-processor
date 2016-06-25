@@ -77,7 +77,7 @@ module mips #(
 	input wire [31:0] instr_in, data_in,
 	output reg data_rd_wr,
 	output reg [31:0] data_out, data_addr,
-	output wire [31:0] instr_addr
+	output reg [31:0] instr_addr
 );
 	reg [4:0] stage;
 
@@ -126,12 +126,13 @@ module mips #(
 	begin: MIPS
 		if (reset == 1) begin
 			// Reset Processor
-			stage <= 'h1;
 
 			// Reset the return address register in next clock cycle
 			reset_return_address_register <= 1;
 		end else if (reset_return_address_register == 1) begin
 			reset_return_address_register <= 0;
+
+			stage <= 'h1;
 		end else begin
 			stage[4:1] <= stage[3:0];
 			stage[0] <= stage[4];
@@ -140,26 +141,34 @@ module mips #(
 
 
 	// FETCH
+	always_comb
+	begin : FETCH_COMB
+		instr_addr <= f_pc;
+	end
+
 	always_ff @ (posedge clk)
 	begin : FETCH_FF
 		if (reset == 'b1) begin
 			// Reset PC
 			f_pc <= pc_init;
+			f_instruction_register <= 'h0;
 		end else if (reset_return_address_register == 'b1) begin
 
 		end else begin
-			f_instruction_register <= instr_in;
-
 			if ((stage[2] == 1) && (d_jumping == 1)) begin
 				f_pc <= d_jumping_target;
+				f_instruction_register <= 'h0;
 			end else if ((stage[2] == 1) && (d_branch == 1)) begin
 				f_pc <= f_pc + d_signed_extended_offset;
+				f_instruction_register <= 'h0;
 			end else if (stage[0] == 1) begin
 				f_pc <= f_pc + 'd4;
+				f_instruction_register <= instr_in;
+			end else begin
+				f_instruction_register <= 'h0;
 			end
 		end
 	end
-	assign instr_addr = f_pc;
 
 
 	// DECODE
@@ -179,7 +188,7 @@ module mips #(
 			d_data_rd_wr <= 1;
 		end else if (reset_return_address_register == 1) begin
 
-		end else if (stage[1] == 1) begin
+		end else begin
 			d_pc <= f_pc;
 
 			case (f_instruction_register[31:26])
@@ -410,7 +419,7 @@ module mips #(
 			e_data_rd_wr <= 1;
 		end else if (reset_return_address_register == 1) begin
 
-		end else if (stage[2] == 1) begin
+		end else begin
 			e_rf_wr_en <= d_rf_wr_en;
 			e_data_rd_wr <= d_data_rd_wr;
 			e_wb_sel <= d_wb_sel;
@@ -452,7 +461,7 @@ module mips #(
 			m_rf_wr_en <= 0;
 		end else if (reset_return_address_register == 1) begin
 
-		end else if (stage[3] == 1) begin
+		end else begin
 			m_alu_out <= e_alu_out;
 			m_wb_sel <= e_wb_sel;
 			m_rf_wr_en <= e_rf_wr_en;
