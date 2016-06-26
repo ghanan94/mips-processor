@@ -107,6 +107,9 @@ module mips #(
 	reg [31:0] rf_wr_data;
 	wire [31:0] rf_rd0_data, rf_rd1_data;
 
+	// test
+	reg [31:0] d_signed_extended_offset_t, d_jumping_target_t;
+	reg d_branch_t, d_jumping_t;
 
 	// This signal will be used to reset R31 (return address register)
 	reg reset_return_address_register;
@@ -135,7 +138,7 @@ module mips #(
 			stage <= 'h1;
 		end else begin
 			stage[4:1] <= stage[3:0];
-			stage[0] <= stage[4];
+			stage[0] <= 'h1;
 		end
 	end
 
@@ -144,6 +147,16 @@ module mips #(
 	always_comb
 	begin : FETCH_COMB
 		instr_addr <= f_pc;
+
+		if (reset_return_address_register == 'b1) begin
+			instr_addr <= f_pc;
+		end else if (d_jumping_t == 1) begin
+			instr_addr <= d_jumping_target_t;
+		end else if (d_branch_t == 1) begin
+			instr_addr <= f_pc + d_signed_extended_offset_t;
+		end else begin
+			instr_addr <= f_pc + 4;
+		end
 	end
 
 	always_ff @ (posedge clk)
@@ -155,7 +168,14 @@ module mips #(
 		end else if (reset_return_address_register == 'b1) begin
 
 		end else begin
-			if ((stage[2] == 1) && (d_jumping == 1)) begin
+			if (stage[0] == 1) begin
+				f_instruction_register <= instr_in;
+				f_pc <= instr_addr;
+			end else begin
+				f_instruction_register <= 'h0;
+			end
+
+			/*if ((stage[2] == 1) && (d_jumping == 1)) begin
 				f_pc <= d_jumping_target;
 				f_instruction_register <= 'h0;
 			end else if ((stage[2] == 1) && (d_branch == 1)) begin
@@ -166,7 +186,7 @@ module mips #(
 				f_instruction_register <= instr_in;
 			end else begin
 				f_instruction_register <= 'h0;
-			end
+			end*/
 		end
 	end
 
@@ -176,6 +196,43 @@ module mips #(
 	begin : DECODE_COMB
 		rf_rd0_num <= f_instruction_register[25:21]; // rs
 		rf_rd1_num <= f_instruction_register[20:16]; // rt
+	end
+
+	// below is used to help achieve a test to accomplish a branch and jump
+	// (only jr, bne, and beq for now) with 1 branch delay slot
+	always_comb
+	begin
+		case (f_instruction_register[31:26])
+			SPECIAL: begin
+				d_branch_t <= 0;
+
+				case (f_instruction_register[5:0])
+					JR: begin
+						d_jumping_target_t <= rf_rd0_data;
+						d_jumping_t <= 1;
+					end
+					default: begin
+						d_jumping_t <= 0;
+					end
+				endcase
+			end
+			BEQ    : begin
+				d_signed_extended_offset_t <= {{14{f_instruction_register[15]}}, f_instruction_register[15:0], 2'b00};
+
+				d_jumping_t <= 0;
+				d_branch_t <= rf_rd0_data == rf_rd1_data; // branch if rs == rt
+			end
+			BNE    : begin
+				d_signed_extended_offset_t <= {{14{f_instruction_register[15]}}, f_instruction_register[15:0], 2'b00};
+
+				d_jumping_t <= 0;
+				d_branch_t <= rf_rd0_data != rf_rd1_data; // branch if rs != rt
+			end
+			default : begin
+				d_branch_t <= 0;
+				d_jumping_t <= 0;
+			end
+		endcase
 	end
 
 	always_ff @ (posedge clk)
