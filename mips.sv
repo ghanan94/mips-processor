@@ -94,7 +94,7 @@ module mips #(
 	// Execute stage
 	reg e_rf_wr_en, e_data_rd_wr, e_wb_sel;
 	reg [4:0] e_wb_register;
-	reg [31:0] e_alu_out, e_mem_data_to_store, e_alu_iA, e_alu_iB;
+	reg [31:0] e_alu_out, e_alu_out_comb, e_mem_data_to_store, e_alu_iA, e_alu_iB;
 
 	// Memory stage
 	reg m_rf_wr_en, m_wb_sel;
@@ -159,7 +159,7 @@ module mips #(
 				f_pc <= d_jumping_target;
 				f_instruction_register <= 'h0;
 			end else if ((stage[2] == 1) && (d_branch == 1)) begin
-				f_pc <= f_pc + d_signed_extended_offset;
+				f_pc <= e_alu_out_comb;
 				f_instruction_register <= 'h0;
 			end else if (stage[0] == 1) begin
 				f_pc <= f_pc + 'd4;
@@ -295,6 +295,9 @@ module mips #(
 					d_rf_wr_en <= 1;
 				end
 				BEQ    : begin
+					d_ALU_sel <= ADD;
+					d_muxA_sel <= 0; // d_pc
+					d_muxB_sel <= 1; // offset
 					d_signed_extended_offset <= {{14{f_instruction_register[15]}}, f_instruction_register[15:0], 2'b00};
 
 					d_branch <= rf_rd0_data == rf_rd1_data; // branch if rs == rt
@@ -303,6 +306,9 @@ module mips #(
 					d_rf_wr_en <= 0;
 				end
 				BNE    : begin
+					d_ALU_sel <= ADD;
+					d_muxA_sel <= 0; // d_pc
+					d_muxB_sel <= 1; // offset
 					d_signed_extended_offset <= {{14{f_instruction_register[15]}}, f_instruction_register[15:0], 2'b00};
 
 					d_branch <= rf_rd0_data != rf_rd1_data; // branch if rs != rt
@@ -406,9 +412,21 @@ module mips #(
 
 	// EXECUTE
 	always_comb
-	begin : EXECUTE_COMB
+	begin : EXECUTE_ALU_INPUTS
 		e_alu_iA <= (d_muxA_sel == 1) ? d_rd0 : d_pc;
 		e_alu_iB <= (d_muxB_sel == 1) ? d_signed_extended_offset : d_rd1;
+	end
+
+	always_comb
+	begin : EXECUTE_ALU
+		case (d_ALU_sel)
+			ADD                 : e_alu_out_comb <= e_alu_iA + e_alu_iB;
+			SUB                 : e_alu_out_comb <= e_alu_iA - e_alu_iB;
+			MULTIPLY            : e_alu_out_comb <= e_alu_iA * e_alu_iB;
+			SHIFT_LEFT_LOGICAL  : e_alu_out_comb <= e_alu_iA << e_alu_iB;
+			LESS_THAN           : e_alu_out_comb <= e_alu_iA < e_alu_iB;
+			default             : e_alu_out_comb <= 'd0;
+		endcase
 	end
 
 	always_ff @ (posedge clk)
@@ -425,15 +443,7 @@ module mips #(
 			e_wb_sel <= d_wb_sel;
 			e_mem_data_to_store <= d_rd1;
 			e_wb_register <= d_wb_register;
-
-			case (d_ALU_sel)
-				ADD                 : e_alu_out <= e_alu_iA + e_alu_iB;
-				SUB                 : e_alu_out <= e_alu_iA - e_alu_iB;
-				MULTIPLY            : e_alu_out <= e_alu_iA * e_alu_iB;
-				SHIFT_LEFT_LOGICAL  : e_alu_out <= e_alu_iA << e_alu_iB;
-				LESS_THAN           : e_alu_out <= e_alu_iA < e_alu_iB;
-				default             : e_alu_out <= 'd0;
-			endcase
+			e_alu_out <= e_alu_out_comb;
 		end
 	end
 
