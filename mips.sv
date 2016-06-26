@@ -75,8 +75,8 @@ module mips #(
 )(
 	input wire clk, reset,
 	input wire [31:0] instr_in, data_in,
-	output reg data_rd_wr,
-	output reg [31:0] data_out, data_addr,
+	output wire data_rd_wr,
+	output wire [31:0] data_out, data_addr,
 	output reg [31:0] instr_addr
 );
 	reg [4:0] stage;
@@ -94,7 +94,8 @@ module mips #(
 	// Execute stage
 	reg e_rf_wr_en, e_data_rd_wr, e_wb_sel;
 	reg [4:0] e_wb_register;
-	reg [31:0] e_alu_out, e_alu_out_comb, e_mem_data_to_store, e_alu_iA, e_alu_iB;
+	reg [31:0] e_alu_out, e_alu_out_comb, e_mem_data_to_store;
+	wire [31:0] e_alu_iA, e_alu_iB;
 
 	// Memory stage
 	reg m_rf_wr_en, m_wb_sel;
@@ -102,8 +103,9 @@ module mips #(
 	reg [31:0] m_alu_out;
 
 	// Register File signals
-	reg rf_wr_en;
-	reg [4:0] rf_wr_num, rf_rd0_num, rf_rd1_num;
+	wire rf_wr_en;
+	reg [4:0] rf_wr_num;
+	wire [4:0] rf_rd0_num, rf_rd1_num;
 	reg [31:0] rf_wr_data;
 	wire [31:0] rf_rd0_data, rf_rd1_data;
 
@@ -129,7 +131,8 @@ module mips #(
 	begin: MIPS
 		if (reset == 1) begin
 			// Reset Processor
-
+			stage <= 'h0;
+			
 			// Reset the return address register in next clock cycle
 			reset_return_address_register <= 1;
 		end else if (reset_return_address_register == 1) begin
@@ -146,8 +149,6 @@ module mips #(
 	// FETCH
 	always_comb
 	begin : FETCH_COMB
-		instr_addr <= f_pc;
-
 		if (reset_return_address_register == 'b1) begin
 			instr_addr <= f_pc;
 		end else if (d_jumping_t == 1) begin
@@ -157,6 +158,8 @@ module mips #(
 		end else begin
 			instr_addr <= f_pc + 4;
 		end
+
+		/*instr_addr <= f_pc;*/
 	end
 
 	always_ff @ (posedge clk)
@@ -192,11 +195,8 @@ module mips #(
 
 
 	// DECODE
-	always_comb
-	begin : DECODE_COMB
-		rf_rd0_num <= f_instruction_register[25:21]; // rs
-		rf_rd1_num <= f_instruction_register[20:16]; // rt
-	end
+	assign rf_rd0_num = f_instruction_register[25:21]; // rs
+	assign rf_rd1_num = f_instruction_register[20:16]; // rt
 
 	// below is used to help achieve a test to accomplish a branch and jump
 	// (only jr, bne, and beq for now) with 1 branch delay slot
@@ -433,11 +433,8 @@ module mips #(
 
 
 	// EXECUTE
-	always_comb
-	begin : EXECUTE_ALU_INPUTS
-		e_alu_iA <= (d_muxA_sel == 1) ? d_rd0 : d_pc;
-		e_alu_iB <= (d_muxB_sel == 1) ? d_signed_extended_offset : d_rd1;
-	end
+	assign e_alu_iA = (d_muxA_sel == 1) ? d_rd0 : d_pc;
+	assign e_alu_iB = (d_muxB_sel == 1) ? d_signed_extended_offset : d_rd1;
 
 	always_comb
 	begin : EXECUTE_ALU
@@ -453,60 +450,34 @@ module mips #(
 
 	always_ff @ (posedge clk)
 	begin : EXECUTE_FF
-		if (reset == 1) begin
-			// Reset
-			e_rf_wr_en <= 0;
-			e_data_rd_wr <= 1;
-		end else if (reset_return_address_register == 1) begin
-
-		end else begin
-			e_rf_wr_en <= d_rf_wr_en;
-			e_data_rd_wr <= d_data_rd_wr;
-			e_wb_sel <= d_wb_sel;
-			e_mem_data_to_store <= d_rd1;
-			e_wb_register <= d_wb_register;
-			e_alu_out <= e_alu_out_comb;
-		end
+		e_rf_wr_en <= ~reset & ~reset_return_address_register & d_rf_wr_en;
+		e_data_rd_wr <= reset | reset_return_address_register| d_data_rd_wr;
+		e_wb_sel <= d_wb_sel;
+		e_mem_data_to_store <= d_rd1;
+		e_wb_register <= d_wb_register;
+		e_alu_out <= e_alu_out_comb;
 	end
 
 
 	// MEMORY
-	always_comb
-	begin : MEMORY_COMB
-		data_addr <= e_alu_out;
-		data_out <= e_mem_data_to_store;
-
-		if (reset == 1) begin
-			// Reset
-			data_rd_wr <= 1;
-		end else if (reset_return_address_register == 1) begin
-			data_rd_wr <= 1;
-		end else begin
-			data_rd_wr <= e_data_rd_wr;
-		end
-	end
+	assign data_addr = e_alu_out;
+	assign data_out = e_mem_data_to_store;
+	assign data_rd_wr = reset | reset_return_address_register | e_data_rd_wr;
 
 	always_ff @ (posedge clk)
 	begin : MEMORY_FF
-		if (reset == 1) begin
-			// RESET
-			m_rf_wr_en <= 0;
-		end else if (reset_return_address_register == 1) begin
-
-		end else begin
-			m_alu_out <= e_alu_out;
-			m_wb_sel <= e_wb_sel;
-			m_rf_wr_en <= e_rf_wr_en;
-			m_wb_register <= e_wb_register;
-		end
+		m_rf_wr_en <= ~reset & ~reset_return_address_register & e_rf_wr_en;
+		m_alu_out <= e_alu_out;
+		m_wb_sel <= e_wb_sel;
+		m_wb_register <= e_wb_register;
 	end
 
 
 	// WRITEBACK
+	assign rf_wr_en = reset | reset_return_address_register | m_rf_wr_en;
+
 	always_comb
 	begin : WRITEBACK_COMB
-		rf_wr_en <= reset | reset_return_address_register | (m_rf_wr_en & stage[4]);
-
 		if (reset == 1) begin
 			rf_wr_num <= 'd29;
 			rf_wr_data <= sp_init;
