@@ -86,7 +86,7 @@ module mips #(
 
 	// Decode signals
 	reg [31:0] d_pc, d_signed_extended_offset, d_rd0, d_rd1, d_jumping_target;
-	reg [4:0] d_wb_register;
+	reg [4:0] d_wb_register, d_shamt;
 	// A (0: pc; 1: rs); B (0: rt; 1: offset)
 	reg d_muxA_sel, d_muxB_sel, d_jumping, d_branch, d_rf_wr_en, d_data_rd_wr, d_wb_sel; // (d_wb_sel (0: alu_out, 1: mem_out))
 	reg [2:0] d_ALU_sel;
@@ -190,16 +190,18 @@ module mips #(
 
 		end else begin
 			d_pc <= f_pc;
+			d_shamt <= f_instruction_register[10:6];
+			d_rd0 <= rf_rd0_data; // rs
+			d_rd1 <= rf_rd1_data; // rt
 
 			case (f_instruction_register[31:26])
 				SPECIAL : begin
 					case (f_instruction_register[5:0])
 						SLL: begin
 							d_ALU_sel <= SHIFT_LEFT_LOGICAL;
-							d_muxA_sel <= 1; // rt
-							d_muxB_sel <= 1; // offset
+							d_muxA_sel <= 1; // rs
+							d_muxB_sel <= 0; // rt
 							d_signed_extended_offset <= {27'b0, f_instruction_register[10:6]};
-							d_rd0 <= rf_rd1_data; // rt
 
 							d_wb_register <= f_instruction_register[15:11]; // rd
 							d_wb_sel <= 0;
@@ -221,8 +223,6 @@ module mips #(
 							d_ALU_sel <= ADD;
 							d_muxA_sel <= 1; // rs
 							d_muxB_sel <= 0; // rt
-							d_rd0 <= rf_rd0_data; // rs
-							d_rd1 <= rf_rd1_data; // rt
 
 							d_wb_register <= f_instruction_register[15:11]; // rt
 							d_wb_sel <= 0;
@@ -236,8 +236,6 @@ module mips #(
 							d_ALU_sel <= SUB;
 							d_muxA_sel <= 1; // rs
 							d_muxB_sel <= 0; // rt
-							d_rd0 <= rf_rd0_data; // rs
-							d_rd1 <= rf_rd1_data; // rt
 
 							d_wb_register <= f_instruction_register[15:11]; // rt
 							d_wb_sel <= 0;
@@ -251,8 +249,6 @@ module mips #(
 							d_ALU_sel <= LESS_THAN;
 							d_muxA_sel <= 1; // rs
 							d_muxB_sel <= 0; // rt
-							d_rd0 <= rf_rd0_data; // rs
-							d_rd1 <= rf_rd1_data; // rt
 
 							d_wb_register <= f_instruction_register[15:11]; // rt
 							d_wb_sel <= 0;
@@ -321,7 +317,6 @@ module mips #(
 					d_muxA_sel <= 1; // rs
 					d_muxB_sel <= 1; // offset
 					d_signed_extended_offset <= {{16{f_instruction_register[15]}}, f_instruction_register[15:0]};
-					d_rd0 <= rf_rd0_data; // rs
 
 					d_wb_register <= f_instruction_register[20:16]; // rt
 					d_wb_sel <= 0;
@@ -336,7 +331,6 @@ module mips #(
 					d_muxA_sel <= 1; // rs
 					d_muxB_sel <= 1; // offset
 					d_signed_extended_offset <= {{16{f_instruction_register[15]}}, f_instruction_register[15:0]};
-					d_rd0 <= rf_rd0_data; // rs
 
 					d_wb_register <= f_instruction_register[20:16]; // rt
 					d_wb_sel <= 0;
@@ -352,8 +346,6 @@ module mips #(
 							d_ALU_sel <= MULTIPLY;
 							d_muxA_sel <= 1; // rs
 							d_muxB_sel <= 0; // rt
-							d_rd0 <= rf_rd0_data; // rs
-							d_rd1 <= rf_rd1_data; // rt
 
 							d_wb_register <= f_instruction_register[15:11]; // rd
 							d_wb_sel <= 0;
@@ -376,7 +368,6 @@ module mips #(
 					d_muxA_sel <= 1; // rs
 					d_muxB_sel <= 1; // offset
 					d_signed_extended_offset <= {{16{f_instruction_register[15]}}, f_instruction_register[15:0]};
-					d_rd0 <= rf_rd0_data; // rs
 
 					d_wb_register <= f_instruction_register[20:16]; // rt
 					d_wb_sel <= 1;
@@ -391,8 +382,6 @@ module mips #(
 					d_muxA_sel <= 1; // rs
 					d_muxB_sel <= 1; // offset
 					d_signed_extended_offset <= {{16{f_instruction_register[15]}}, f_instruction_register[15:0]};
-					d_rd0 <= rf_rd0_data; // rs
-					d_rd1 <= rf_rd1_data; // rt
 
 					d_branch <= 0;
 					d_jumping <= 0;
@@ -423,7 +412,7 @@ module mips #(
 			ADD                 : e_alu_out_comb <= e_alu_iA + e_alu_iB;
 			SUB                 : e_alu_out_comb <= e_alu_iA - e_alu_iB;
 			MULTIPLY            : e_alu_out_comb <= e_alu_iA * e_alu_iB;
-			SHIFT_LEFT_LOGICAL  : e_alu_out_comb <= e_alu_iA << e_alu_iB;
+			SHIFT_LEFT_LOGICAL  : e_alu_out_comb <= e_alu_iB << d_shamt;
 			LESS_THAN           : e_alu_out_comb <= e_alu_iA < e_alu_iB;
 			default             : e_alu_out_comb <= 'd0;
 		endcase
