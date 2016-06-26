@@ -196,72 +196,49 @@ module mips #(
 
 			case (f_instruction_register[31:26])
 				SPECIAL : begin
+					d_muxA_sel <= 1; // rs
+					d_muxB_sel <= 0; // rt
+
+					d_wb_register <= f_instruction_register[15:11]; // rd
+					d_wb_sel <= 0;
+
+					d_branch <= 0; // no branching
+					d_data_rd_wr <= 1; // no writing to mem
+
 					case (f_instruction_register[5:0])
 						SLL: begin
 							d_ALU_sel <= SHIFT_LEFT_LOGICAL;
-							d_muxA_sel <= 1; // rs
-							d_muxB_sel <= 0; // rt
 							d_signed_extended_offset <= {27'b0, f_instruction_register[10:6]};
 
-							d_wb_register <= f_instruction_register[15:11]; // rd
-							d_wb_sel <= 0;
-
-							d_branch <= 0;
 							d_jumping <= 0;
-							d_data_rd_wr <= 1;
 							d_rf_wr_en <= 1;
 						end
 						JR   : begin
 							d_jumping_target <= rf_rd0_data;
 
-							d_branch <= 0;
 							d_jumping <= 1;
-							d_data_rd_wr <= 1;
 							d_rf_wr_en <= 0;
 						end
 						ADDU   : begin
 							d_ALU_sel <= ADD;
-							d_muxA_sel <= 1; // rs
-							d_muxB_sel <= 0; // rt
 
-							d_wb_register <= f_instruction_register[15:11]; // rt
-							d_wb_sel <= 0;
-
-							d_branch <= 0;
 							d_jumping <= 0;
-							d_data_rd_wr <= 1;
 							d_rf_wr_en <= 1;
 						end
 						SUBU   : begin
 							d_ALU_sel <= SUB;
-							d_muxA_sel <= 1; // rs
-							d_muxB_sel <= 0; // rt
 
-							d_wb_register <= f_instruction_register[15:11]; // rt
-							d_wb_sel <= 0;
-
-							d_branch <= 0;
 							d_jumping <= 0;
-							d_data_rd_wr <= 1;
 							d_rf_wr_en <= 1;
 						end
 						SLT    : begin
 							d_ALU_sel <= LESS_THAN;
-							d_muxA_sel <= 1; // rs
-							d_muxB_sel <= 0; // rt
 
-							d_wb_register <= f_instruction_register[15:11]; // rt
-							d_wb_sel <= 0;
-
-							d_branch <= 0;
 							d_jumping <= 0;
-							d_data_rd_wr <= 1;
 							d_rf_wr_en <= 1;
 						end
 						default: begin
-							d_branch <= 0; // no branching
 							d_jumping <= 0; // no jumping
-							d_data_rd_wr <= 1; // no write to mem
 							d_rf_wr_en <= 0; // no updating reg file
 						end
 					endcase
@@ -341,24 +318,23 @@ module mips #(
 					d_rf_wr_en <= 1;
 				end
 				SPECIAL2: begin
+					d_muxA_sel <= 1; // rs
+					d_muxB_sel <= 0; // rt
+
+					d_wb_register <= f_instruction_register[15:11]; // rd
+					d_wb_sel <= 0;
+
+					d_branch <= 0; // no branching
+					d_jumping <= 0; // no jumping
+					d_data_rd_wr <= 1; // no write to mem
+
 					case (f_instruction_register[5:0])
 						MUL: begin
 							d_ALU_sel <= MULTIPLY;
-							d_muxA_sel <= 1; // rs
-							d_muxB_sel <= 0; // rt
 
-							d_wb_register <= f_instruction_register[15:11]; // rd
-							d_wb_sel <= 0;
-
-							d_branch <= 0;
-							d_jumping <= 0;
-							d_data_rd_wr <= 1;
 							d_rf_wr_en <= 1;
 						end
 						default   : begin
-							d_branch <= 0; // no branching
-							d_jumping <= 0; // no jumping
-							d_data_rd_wr <= 1; // no write to mem
 							d_rf_wr_en <= 0; // no updating reg file
 						end
 					endcase
