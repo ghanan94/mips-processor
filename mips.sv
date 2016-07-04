@@ -174,11 +174,11 @@ module mips #(
 				f_instruction_register <= 'h0;
 			end
 
-			/*if ((stage[2] == 1) && (d_jumping == 1)) begin
+			/*if (d_jumping == 1) begin
 				f_pc <= d_jumping_target;
 				f_instruction_register <= 'h0;
-			end else if ((stage[2] == 1) && (d_branch == 1)) begin
-				f_pc <= e_alu_out_comb;
+			end else if (d_branch == 1) begin
+				f_pc <= f_pc + d_branch_offset;
 				f_instruction_register <= 'h0;
 			end else if (stage[0] == 1) begin
 				f_pc <= f_pc + 'd4;
