@@ -85,7 +85,7 @@ module mips #(
 	reg [31:0] f_pc, f_instruction_register;
 
 	// Decode signals
-	reg [31:0] d_pc, d_signed_extended_offset, d_rd0, d_rd1, d_jumping_target;
+	reg [31:0] d_pc, d_signed_extended_offset, d_rd0, d_rd1, d_jumping_target, d_branch_offset;
 	reg [4:0] d_wb_register, d_shamt;
 	// A (0: pc; 1: rs); B (0: rt; 1: offset)
 	reg d_muxA_sel, d_muxB_sel, d_jumping, d_branch, d_rf_wr_en, d_data_rd_wr, d_wb_sel; // (d_wb_sel (0: alu_out, 1: mem_out))
@@ -109,10 +109,6 @@ module mips #(
 	reg [31:0] rf_wr_data;
 	wire [31:0] rf_rd0_data, rf_rd1_data;
 
-	// test
-	reg [31:0] d_signed_extended_offset_t, d_jumping_target_t;
-	reg d_branch_t, d_jumping_t;
-
 	// This signal will be used to reset R31 (return address register)
 	reg reset_return_address_register;
 
@@ -132,7 +128,7 @@ module mips #(
 		if (reset == 1) begin
 			// Reset Processor
 			stage <= 'h0;
-			
+
 			// Reset the return address register in next clock cycle
 			reset_return_address_register <= 1;
 		end else if (reset_return_address_register == 1) begin
@@ -151,10 +147,10 @@ module mips #(
 	begin : FETCH_COMB
 		if (reset_return_address_register == 'b1) begin
 			instr_addr <= f_pc;
-		end else if (d_jumping_t == 1) begin
-			instr_addr <= d_jumping_target_t;
-		end else if (d_branch_t == 1) begin
-			instr_addr <= f_pc + d_signed_extended_offset_t;
+		end else if (d_jumping == 1) begin
+			instr_addr <= d_jumping_target;
+		end else if (d_branch == 1) begin
+			instr_addr <= f_pc + d_branch_offset;
 		end else begin
 			instr_addr <= f_pc + 4;
 		end
@@ -198,39 +194,50 @@ module mips #(
 	assign rf_rd0_num = f_instruction_register[25:21]; // rs
 	assign rf_rd1_num = f_instruction_register[20:16]; // rt
 
-	// below is used to help achieve a test to accomplish a branch and jump
-	// (only jr, bne, and beq for now) with 1 branch delay slot
+	// determine branching/jumping
 	always_comb
 	begin
 		case (f_instruction_register[31:26])
 			SPECIAL: begin
-				d_branch_t <= 0;
+				d_branch <= 0;
 
 				case (f_instruction_register[5:0])
 					JR: begin
-						d_jumping_target_t <= rf_rd0_data;
-						d_jumping_t <= 1;
+						d_jumping_target <= rf_rd0_data;
+						d_jumping <= 1;
 					end
 					default: begin
-						d_jumping_t <= 0;
+						d_jumping <= 0;
 					end
 				endcase
 			end
-			BEQ    : begin
-				d_signed_extended_offset_t <= {{14{f_instruction_register[15]}}, f_instruction_register[15:0], 2'b00};
+			J      : begin
+				d_jumping_target <= {f_pc[31:28], f_instruction_register[25:0], 2'b00};
 
-				d_jumping_t <= 0;
-				d_branch_t <= rf_rd0_data == rf_rd1_data; // branch if rs == rt
+				d_jumping <= 1;
+				d_branch <= 0;
+			end
+			JAL    : begin
+				d_jumping_target <= {f_pc[31:28], f_instruction_register[25:0], 2'b00};
+
+				d_jumping <= 1;
+				d_branch <= 0;
+			end
+			BEQ    : begin
+				d_branch_offset <= {{14{f_instruction_register[15]}}, f_instruction_register[15:0], 2'b00};
+
+				d_jumping <= 0;
+				d_branch <= rf_rd0_data == rf_rd1_data; // branch if rs == rt
 			end
 			BNE    : begin
-				d_signed_extended_offset_t <= {{14{f_instruction_register[15]}}, f_instruction_register[15:0], 2'b00};
+				d_branch_offset <= {{14{f_instruction_register[15]}}, f_instruction_register[15:0], 2'b00};
 
-				d_jumping_t <= 0;
-				d_branch_t <= rf_rd0_data != rf_rd1_data; // branch if rs != rt
+				d_jumping <= 0;
+				d_branch <= rf_rd0_data != rf_rd1_data; // branch if rs != rt
 			end
 			default : begin
-				d_branch_t <= 0;
-				d_jumping_t <= 0;
+				d_branch <= 0;
+				d_jumping <= 0;
 			end
 		endcase
 	end
@@ -239,8 +246,6 @@ module mips #(
 	begin : DECODE_FF
 		if (reset == 1) begin
 			// Reset
-			d_branch <= 0;
-			d_jumping <= 0;
 			d_rf_wr_en <= 0;
 			d_data_rd_wr <= 1;
 		end else if (reset_return_address_register == 1) begin
@@ -259,7 +264,6 @@ module mips #(
 					d_wb_register <= f_instruction_register[15:11]; // rd
 					d_wb_sel <= 0;
 
-					d_branch <= 0; // no branching
 					d_data_rd_wr <= 1; // no writing to mem
 
 					case (f_instruction_register[5:0])
@@ -267,50 +271,29 @@ module mips #(
 							d_ALU_sel <= SHIFT_LEFT_LOGICAL;
 							d_signed_extended_offset <= {27'b0, f_instruction_register[10:6]};
 
-							d_jumping <= 0;
 							d_rf_wr_en <= 1;
-						end
-						JR   : begin
-							d_jumping_target <= rf_rd0_data;
-
-							d_jumping <= 1;
-							d_rf_wr_en <= 0;
 						end
 						ADDU   : begin
 							d_ALU_sel <= ADD;
 
-							d_jumping <= 0;
 							d_rf_wr_en <= 1;
 						end
 						SUBU   : begin
 							d_ALU_sel <= SUB;
 
-							d_jumping <= 0;
 							d_rf_wr_en <= 1;
 						end
 						SLT    : begin
 							d_ALU_sel <= LESS_THAN;
 
-							d_jumping <= 0;
 							d_rf_wr_en <= 1;
 						end
 						default: begin
-							d_jumping <= 0; // no jumping
 							d_rf_wr_en <= 0; // no updating reg file
 						end
 					endcase
 				end
-				J      : begin
-					d_jumping_target <= {f_pc[31:28], f_instruction_register[25:0], 2'b00};
-
-					d_branch <= 0;
-					d_jumping <= 1;
-					d_data_rd_wr <= 1;
-					d_rf_wr_en <= 0;
-				end
 				JAL    : begin
-					d_jumping_target <= {f_pc[31:28], f_instruction_register[25:0], 2'b00};
-
 					d_ALU_sel <= ADD;
 					d_muxA_sel <= 0; // d_pc
 					d_muxB_sel <= 1; // offset
@@ -319,32 +302,8 @@ module mips #(
 					d_wb_register <= 'd31; // write to return address regiester
 					d_wb_sel <= 0;
 
-					d_branch <= 0;
-					d_jumping <= 1;
 					d_data_rd_wr <= 1;
 					d_rf_wr_en <= 1;
-				end
-				BEQ    : begin
-					d_ALU_sel <= ADD;
-					d_muxA_sel <= 0; // d_pc
-					d_muxB_sel <= 1; // offset
-					d_signed_extended_offset <= {{14{f_instruction_register[15]}}, f_instruction_register[15:0], 2'b00};
-
-					d_branch <= rf_rd0_data == rf_rd1_data; // branch if rs == rt
-					d_jumping <= 0;
-					d_data_rd_wr <= 1;
-					d_rf_wr_en <= 0;
-				end
-				BNE    : begin
-					d_ALU_sel <= ADD;
-					d_muxA_sel <= 0; // d_pc
-					d_muxB_sel <= 1; // offset
-					d_signed_extended_offset <= {{14{f_instruction_register[15]}}, f_instruction_register[15:0], 2'b00};
-
-					d_branch <= rf_rd0_data != rf_rd1_data; // branch if rs != rt
-					d_jumping <= 0;
-					d_data_rd_wr <= 1;
-					d_rf_wr_en <= 0;
 				end
 				ADDIU  : begin
 					d_ALU_sel <= ADD;
@@ -355,8 +314,6 @@ module mips #(
 					d_wb_register <= f_instruction_register[20:16]; // rt
 					d_wb_sel <= 0;
 
-					d_branch <= 0;
-					d_jumping <= 0;
 					d_data_rd_wr <= 1;
 					d_rf_wr_en <= 1;
 				end
@@ -369,8 +326,6 @@ module mips #(
 					d_wb_register <= f_instruction_register[20:16]; // rt
 					d_wb_sel <= 0;
 
-					d_branch <= 0;
-					d_jumping <= 0;
 					d_data_rd_wr <= 1;
 					d_rf_wr_en <= 1;
 				end
@@ -381,8 +336,6 @@ module mips #(
 					d_wb_register <= f_instruction_register[15:11]; // rd
 					d_wb_sel <= 0;
 
-					d_branch <= 0; // no branching
-					d_jumping <= 0; // no jumping
 					d_data_rd_wr <= 1; // no write to mem
 
 					case (f_instruction_register[5:0])
@@ -405,8 +358,6 @@ module mips #(
 					d_wb_register <= f_instruction_register[20:16]; // rt
 					d_wb_sel <= 1;
 
-					d_branch <= 0;
-					d_jumping <= 0;
 					d_data_rd_wr <= 1;
 					d_rf_wr_en <= 1;
 				end
@@ -416,14 +367,10 @@ module mips #(
 					d_muxB_sel <= 1; // offset
 					d_signed_extended_offset <= {{16{f_instruction_register[15]}}, f_instruction_register[15:0]};
 
-					d_branch <= 0;
-					d_jumping <= 0;
 					d_data_rd_wr <= 0;
 					d_rf_wr_en <= 0;
 				end
 				default: begin
-					d_branch <= 0; // no branching
-					d_jumping <= 0; // no jumping
 					d_data_rd_wr <= 1; // no write to mem
 					d_rf_wr_en <= 0; // no updating reg file
 				end
