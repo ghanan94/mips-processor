@@ -42,7 +42,7 @@ enum bit [5:0] {
 	BEQ      = 'b000100,
 	BNE      = 'b000101,
 	ADDIU    = 'b001001,
-	SLTI		 = 'b001010,
+	SLTI     = 'b001010,
 	SPECIAL2 = 'b011100,
 	LW       = 'b100011,
 	SW       = 'b101011
@@ -88,14 +88,15 @@ module mips #(
 	reg [31:0] d_pc, d_signed_extended_offset, d_rd0, d_rd1, d_jumping_target, d_branch_offset;
 	reg [4:0] d_wb_register, d_shamt;
 	// A (0: pc; 1: rs); B (0: rt; 1: offset)
-	reg d_muxA_sel, d_muxB_sel, d_jumping, d_branch, d_rf_wr_en, d_data_rd_wr, d_wb_sel; // (d_wb_sel (0: alu_out, 1: mem_out))
+	reg [1:0] d_muxA_sel, d_muxB_sel;
+	reg d_m_data_sel, d_jumping, d_branch, d_rf_wr_en, d_data_rd_wr, d_wb_sel; // (d_wb_sel (0: alu_out, 1: mem_out))
 	reg [2:0] d_ALU_sel;
 
 	// Execute stage
-	reg e_rf_wr_en, e_data_rd_wr, e_wb_sel;
+	reg e_rf_wr_en, e_data_rd_wr, e_m_data_sel, e_wb_sel;
 	reg [4:0] e_wb_register;
 	reg [31:0] e_alu_out, e_alu_out_comb, e_mem_data_to_store;
-	wire [31:0] e_alu_iA, e_alu_iB;
+	reg [31:0] e_alu_iA, e_alu_iB;
 
 	// Memory stage
 	reg m_rf_wr_en, m_wb_sel;
@@ -258,8 +259,24 @@ module mips #(
 
 			case (f_instruction_register[31:26])
 				SPECIAL : begin
-					d_muxA_sel <= 1; // rs
-					d_muxB_sel <= 0; // rt
+					if (d_rf_wr_en == 1 && rf_rd0_num == d_wb_register) begin
+						// Data forward from execute data back into execute input
+						d_muxA_sel <= 2; // e_alu_out
+					end else if (e_rf_wr_en == 1 && rf_rd0_num == e_wb_register) begin
+						d_muxA_sel <= 3; // rf_wr_data
+					end else begin
+						d_muxA_sel <= 1; // rs
+					end
+
+					if (d_rf_wr_en == 1 && rf_rd1_num == d_wb_register) begin
+						// Data forward from execute data back into execute input
+						d_muxB_sel <= 2; // e_alu_out
+					end else if (e_rf_wr_en == 1 && rf_rd1_num == e_wb_register) begin
+						d_muxB_sel <= 3; // rf_wr_data
+					end else begin
+						d_muxB_sel <= 0; // rt
+					end
+
 
 					d_wb_register <= f_instruction_register[15:11]; // rd
 					d_wb_sel <= 0;
@@ -307,7 +324,16 @@ module mips #(
 				end
 				ADDIU  : begin
 					d_ALU_sel <= ADD;
-					d_muxA_sel <= 1; // rs
+
+					if (d_rf_wr_en == 1 && rf_rd0_num == d_wb_register) begin
+						// Data forward from execute data back into execute input
+						d_muxA_sel <= 2; // e_alu_out
+					end else if (e_rf_wr_en == 1 && rf_rd0_num == e_wb_register) begin
+						d_muxA_sel <= 3; // rf_wr_data
+					end else begin
+						d_muxA_sel <= 1; // rs
+					end
+
 					d_muxB_sel <= 1; // offset
 					d_signed_extended_offset <= {{16{f_instruction_register[15]}}, f_instruction_register[15:0]};
 
@@ -319,7 +345,16 @@ module mips #(
 				end
 				SLTI   : begin
 					d_ALU_sel <= LESS_THAN;
-					d_muxA_sel <= 1; // rs
+
+					if (d_rf_wr_en == 1 && rf_rd0_num == d_wb_register) begin
+						// Data forward from execute data back into execute input
+						d_muxA_sel <= 2; // e_alu_out
+					end else if (e_rf_wr_en == 1 && rf_rd0_num == e_wb_register) begin
+						d_muxA_sel <= 3; // rf_wr_data
+					end else begin
+						d_muxA_sel <= 1; // rs
+					end
+
 					d_muxB_sel <= 1; // offset
 					d_signed_extended_offset <= {{16{f_instruction_register[15]}}, f_instruction_register[15:0]};
 
@@ -330,8 +365,23 @@ module mips #(
 					d_rf_wr_en <= 1;
 				end
 				SPECIAL2: begin
-					d_muxA_sel <= 1; // rs
-					d_muxB_sel <= 0; // rt
+					if (d_rf_wr_en == 1 && rf_rd0_num == d_wb_register) begin
+						// Data forward from execute data back into execute input
+						d_muxA_sel <= 2; // e_alu_out
+					end else if (e_rf_wr_en == 1 && rf_rd0_num == e_wb_register) begin
+						d_muxA_sel <= 3; // rf_wr_data
+					end else begin
+						d_muxA_sel <= 1; // rs
+					end
+
+					if (d_rf_wr_en == 1 && rf_rd1_num == d_wb_register) begin
+						// Data forward from execute data back into execute input
+						d_muxB_sel <= 2; // e_alu_out
+					end else if (e_rf_wr_en == 1 && rf_rd1_num == e_wb_register) begin
+						d_muxB_sel <= 3; // rf_wr_data
+					end else begin
+						d_muxB_sel <= 0; // rt
+					end
 
 					d_wb_register <= f_instruction_register[15:11]; // rd
 					d_wb_sel <= 0;
@@ -351,7 +401,16 @@ module mips #(
 				end
 				LW     : begin
 					d_ALU_sel <= ADD;
-					d_muxA_sel <= 1; // rs
+
+					if (d_rf_wr_en == 1 && rf_rd0_num == d_wb_register) begin
+						// Data forward from execute data back into execute input
+						d_muxA_sel <= 2; // e_alu_out
+					end else if (e_rf_wr_en == 1 && rf_rd0_num == e_wb_register) begin
+						d_muxA_sel <= 3; // rf_wr_data
+					end else begin
+						d_muxA_sel <= 1; // rs
+					end
+
 					d_muxB_sel <= 1; // offset
 					d_signed_extended_offset <= {{16{f_instruction_register[15]}}, f_instruction_register[15:0]};
 
@@ -363,7 +422,25 @@ module mips #(
 				end
 				SW     : begin
 					d_ALU_sel <= ADD;
-					d_muxA_sel <= 1; // rs
+
+					if (d_rf_wr_en == 1 && rf_rd0_num == d_wb_register) begin
+						// Data forward from execute data back into execute input
+						d_muxA_sel <= 2; // e_alu_out
+					end else if (e_rf_wr_en == 1 && rf_rd0_num == e_wb_register) begin
+						d_muxA_sel <= 3; // rf_wr_data
+					end else begin
+						d_muxA_sel <= 1; // rs
+					end
+
+					if (d_rf_wr_en == 1 && rf_rd1_num == d_wb_register) begin
+						// Store added data right after an add op. (ADDIU v0, v1, v2 then SW v0, 0(sp))
+						d_m_data_sel = 0;
+					end else if (e_rf_wr_en == 1 && rf_rd1_num == e_wb_register) begin
+						d_muxB_sel <= 3; // rf_wr_data
+					end else begin
+						d_m_data_sel = 1;
+					end
+
 					d_muxB_sel <= 1; // offset
 					d_signed_extended_offset <= {{16{f_instruction_register[15]}}, f_instruction_register[15:0]};
 
@@ -380,8 +457,22 @@ module mips #(
 
 
 	// EXECUTE
-	assign e_alu_iA = (d_muxA_sel == 1) ? d_rd0 : d_pc;
-	assign e_alu_iB = (d_muxB_sel == 1) ? d_signed_extended_offset : d_rd1;
+	always_comb
+	begin : EXECUTE_INPUTS
+		case (d_muxA_sel)
+			0 : e_alu_iA <= d_pc;
+			1 : e_alu_iA <= d_rd0;
+			2 : e_alu_iA <= e_alu_out;
+			default : e_alu_iA <= 'h0;
+		endcase
+
+		case (d_muxB_sel)
+			0 : e_alu_iB <= d_signed_extended_offset;
+			1 : e_alu_iB <= d_rd1;
+			2 : e_alu_iB <= e_alu_out;
+			default : e_alu_iB <= 'h0;
+		endcase
+	end
 
 	always_comb
 	begin : EXECUTE_ALU
@@ -401,6 +492,7 @@ module mips #(
 		e_data_rd_wr <= reset | reset_return_address_register| d_data_rd_wr;
 		e_wb_sel <= d_wb_sel;
 		e_mem_data_to_store <= d_rd1;
+		e_m_data_sel <= d_m_data_sel;
 		e_wb_register <= d_wb_register;
 		e_alu_out <= e_alu_out_comb;
 	end
@@ -408,7 +500,7 @@ module mips #(
 
 	// MEMORY
 	assign data_addr = e_alu_out;
-	assign data_out = e_mem_data_to_store;
+	assign data_out = (d_m_data_sel == 1) ? e_mem_data_to_store : rf_wr_data;
 	assign data_rd_wr = reset | reset_return_address_register | e_data_rd_wr;
 
 	always_ff @ (posedge clk)
