@@ -438,11 +438,9 @@ module mips #(
 
 					if (d_rf_wr_en == 1 && rf_rd1_num == d_wb_register) begin
 						// Store added data right after an add op. (ADDIU v0, v1, v2 then SW v0, 0(sp))
-						d_m_data_sel = 0;
-					end else if (e_rf_wr_en == 1 && rf_rd1_num == e_wb_register) begin
-						d_muxB_sel <= 3; // rf_wr_data
+						d_m_data_sel <= 0;
 					end else begin
-						d_m_data_sel = 1;
+						d_m_data_sel <= 1;
 					end
 
 					d_muxB_sel <= 1; // offset
@@ -467,13 +465,15 @@ module mips #(
 			0 : e_alu_iA <= d_pc;
 			1 : e_alu_iA <= d_rd0;
 			2 : e_alu_iA <= e_alu_out;
+			3 : e_alu_iA <= rf_wr_data;
 			default : e_alu_iA <= 'h0;
 		endcase
 
 		case (d_muxB_sel)
-			0 : e_alu_iB <= d_signed_extended_offset;
-			1 : e_alu_iB <= d_rd1;
+			0 : e_alu_iB <= d_rd1;
+			1 : e_alu_iB <= d_signed_extended_offset;
 			2 : e_alu_iB <= e_alu_out;
+			3 : e_alu_iB <= rf_wr_data;
 			default : e_alu_iB <= 'h0;
 		endcase
 	end
@@ -504,7 +504,7 @@ module mips #(
 
 	// MEMORY
 	assign data_addr = e_alu_out;
-	assign data_out = (d_m_data_sel == 1) ? e_mem_data_to_store : rf_wr_data;
+	assign data_out = (e_m_data_sel == 1) ? e_mem_data_to_store : rf_wr_data;
 	assign data_rd_wr = reset | reset_return_address_register | e_data_rd_wr;
 
 	always_ff @ (posedge clk)
