@@ -194,7 +194,8 @@ module mips #(
 
 
 	// DECODE
-	assign d_stall = (d_rf_wr_en == 1) && (d_data_rd_wr == 1) && (d_wb_sel == 1) && ((rf_rd0_num == d_wb_register) || (rf_rd1_num == d_wb_register));
+	assign d_stall = (d_rf_wr_en == 1) && (d_data_rd_wr == 1) && (d_wb_sel == 1) && ((rf_rd0_num == d_wb_register) || ((rf_rd1_num == d_wb_register) && (f_instruction_register[31:26] != SW)));
+
 	assign d_instruction_register = (d_stall == 1) ? 'h0 : f_instruction_register;
 	assign rf_rd0_num = f_instruction_register[25:21]; // rs
 	assign rf_rd1_num = f_instruction_register[20:16]; // rt
