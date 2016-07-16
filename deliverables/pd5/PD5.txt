@@ -1,0 +1,3 @@
+You are to adding data forwarding and stalling to your pipelined MIPS processor.  This deliverable is worth 12% of your final grade.  There are two marks for each of the six testbenches (BubbleSort, fact, SimpleAdd, SimpleIf, SumArray, Swap).  For each benchmark one mark will be for correct results and the other mark for timing that exceeds that shown in pd5_tb.out by at most one or two cycles.
+
+Download pd5.zip.  It contains the testbench modules in pd5_tb.sv and the expected output in pd5_tb.out.  The same regfile.sv as before is to be used.
