@@ -195,11 +195,19 @@ module mips #(
 
 
 	// DECODE
-	assign d_stall = (d_rf_wr_en == 1) && (d_data_rd_wr == 1) && (d_wb_sel == 1) && ((rf_rd0_num == d_wb_register) || ((rf_rd1_num == d_wb_register) && (f_instruction_register[31:26] != SW)));
+
+	// If previous instruction is a load and rs is a source operand for current instruction
+	// but it is a wb register for the previous instruction, OR rt is being modified by previous
+	// instruction and the current instruction is NOT a store word, stall.
+	// Also stall if previous-previous instruction is a load word, and current instruction
+	// is a possible branch depending on the data from load word.
+	// BEQ = 000100 and BNE = 000101, so we only need to check if 5 MSB of opcode
+	// equals 00010 to check if BEQ or BNE.
+	assign d_stall = ((d_rf_wr_en == 1) && (d_data_rd_wr == 1) && (d_wb_sel == 1) && ((f_instruction_register[25:21] == d_wb_register) || ((f_instruction_register[20:16] == d_wb_register) && (f_instruction_register[31:26] != SW)))) || ((e_rf_wr_en == 1) && (e_data_rd_wr == 1) && (e_wb_sel == 1) && ((f_instruction_register[25:21] == e_wb_register) || (f_instruction_register[20:16] == e_wb_register)) && (f_instruction_register[31:27] == 5'b00010));
 
 	assign d_instruction_register = (d_stall == 1) ? 'h0 : f_instruction_register;
-	assign rf_rd0_num = f_instruction_register[25:21]; // rs
-	assign rf_rd1_num = f_instruction_register[20:16]; // rt
+	assign rf_rd0_num = d_instruction_register[25:21]; // rs
+	assign rf_rd1_num = d_instruction_register[20:16]; // rt
 
 	always_comb
 	begin
