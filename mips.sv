@@ -93,6 +93,7 @@ module mips #(
 	reg [2:0] d_ALU_sel;
 	wire d_stall;
 	wire [31:0] d_instruction_register;
+	reg [5:0] d_branch_check_reg_a, d_branch_check_reg_b;
 
 	// Execute stage
 	reg e_rf_wr_en, e_data_rd_wr, e_m_data_sel, e_wb_sel;
@@ -202,6 +203,21 @@ module mips #(
 
 	always_comb
 	begin
+		if (d_rf_wr_en == 1 && d_wb_register == rf_rd0_num) begin
+			d_branch_check_reg_a <= e_alu_out_comb;
+		end else begin
+			d_branch_check_reg_a <= rf_rd0_data;
+		end
+
+		if (d_rf_wr_en == 1 && d_wb_register == rf_rd1_num) begin
+			d_branch_check_reg_b <= e_alu_out_comb;
+		end else begin
+			d_branch_check_reg_b <= rf_rd1_data;
+		end
+	end
+
+	always_comb
+	begin
 		// determine branching/jumping
 		case (d_instruction_register[31:26])
 			SPECIAL: begin
@@ -233,13 +249,13 @@ module mips #(
 				d_branch_offset <= {{14{d_instruction_register[15]}}, d_instruction_register[15:0], 2'b00};
 
 				d_jumping <= 0;
-				d_branch <= rf_rd0_data == rf_rd1_data; // branch if rs == rt
+				d_branch <= d_branch_check_reg_a == d_branch_check_reg_b; // branch if rs == rt
 			end
 			BNE    : begin
 				d_branch_offset <= {{14{d_instruction_register[15]}}, d_instruction_register[15:0], 2'b00};
 
 				d_jumping <= 0;
-				d_branch <= rf_rd0_data != rf_rd1_data; // branch if rs != rt
+				d_branch <= d_branch_check_reg_a != d_branch_check_reg_b; // branch if rs != rt
 			end
 			default : begin
 				d_branch <= 0;
