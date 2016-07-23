@@ -93,7 +93,7 @@ module mips #(
 	reg [2:0] d_ALU_sel;
 	wire d_stall;
 	wire [31:0] d_instruction_register;
-	reg [5:0] d_branch_check_reg_a, d_branch_check_reg_b;
+	reg [31:0] d_branch_check_reg_a, d_branch_check_reg_b;
 
 	// Execute stage
 	reg e_rf_wr_en, e_data_rd_wr, e_m_data_sel, e_wb_sel;
@@ -213,12 +213,16 @@ module mips #(
 	begin
 		if (e_rf_wr_en == 1 && e_wb_register == rf_rd0_num) begin
 			d_branch_check_reg_a <= e_alu_out;
+		end else if ((m_rf_wr_en == 1) && (m_wb_register == rf_rd0_num)) begin
+			d_branch_check_reg_a <= rf_wr_data;
 		end else begin
 			d_branch_check_reg_a <= rf_rd0_data;
 		end
 
 		if (e_rf_wr_en == 1 && e_wb_register == rf_rd1_num) begin
 			d_branch_check_reg_b <= e_alu_out;
+		end else if ((m_rf_wr_en == 1) && (m_wb_register == rf_rd1_num)) begin
+			d_branch_check_reg_b <= rf_wr_data;
 		end else begin
 			d_branch_check_reg_b <= rf_rd1_data;
 		end
@@ -233,7 +237,12 @@ module mips #(
 
 				case (d_instruction_register[5:0])
 					JR: begin
-						d_jumping_target <= rf_rd0_data;
+						if ((m_rf_wr_en == 1) && (m_wb_register == rf_rd0_num)) begin
+							d_jumping_target <= rf_wr_data;
+						end else begin
+							d_jumping_target <= rf_rd0_data;
+						end
+
 						d_jumping <= 1;
 					end
 					default: begin
@@ -283,8 +292,18 @@ module mips #(
 		end else begin
 			d_pc <= f_pc;
 			d_shamt <= d_instruction_register[10:6];
-			d_rd0 <= rf_rd0_data; // rs
-			d_rd1 <= rf_rd1_data; // rt
+
+			if ((m_rf_wr_en == 1) && (m_wb_register == rf_rd0_num)) begin
+				d_rd0 <= rf_wr_data;
+			end else begin
+				d_rd0 <= rf_rd0_data; // rs
+			end
+
+			if ((m_rf_wr_en == 1) && (m_wb_register == rf_rd1_num)) begin
+				d_rd1 <= rf_wr_data;
+			end else begin
+				d_rd1 <= rf_rd1_data; // rt
+			end
 
 			case (d_instruction_register[31:26])
 				SPECIAL : begin
